@@ -7,12 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <div class="auth-container">
     <div class="auth-box">
-      <a href="index.html" class="to_home">이룸</a>
+      <a href="{{ url_for('index') }}" class="to_home">이룸</a>
       <h2>로그인</h2>
       <form>
         <input type="text" placeholder="아이디" required />
@@ -20,8 +20,8 @@
         <button type="submit">로그인</button>
       </form>
       <div class="auth-links">
-        <a href="find_password.html">비밀번호를 잊으셨나요?</a>
-        <a href="sign_in.html">회원가입</a>
+        <a href="{{ url_for('find_password') }}">비밀번호를 잊으셨나요?</a>
+        <a href="{{ url_for('sign_in') }}">회원가입</a>
       </div>
     </div>
   </div>
