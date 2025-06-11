@@ -60,11 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
     uploadBox.addEventListener('dragover', e => {
     e.preventDefault();
     uploadBox.style.borderColor = '#333';
+    uploadBox.style.backgroundColor = '#eee';
     });
 
     uploadBox.addEventListener('dragleave', e => {
     e.preventDefault();
     uploadBox.style.borderColor = '#999';
+    uploadBox.style.backgroundColor = '#fff';
     });
 
     uploadBox.addEventListener('drop', e => {

@@ -49,6 +49,12 @@ p {
     gap: 0.5vw;
 }
 
+.sign a{
+    background-color: #fff;
+    border-radius: 30px;
+    padding: 0.8rem;
+}
+
 .first-layer{
     display: flex;
     flex-direction: row;
