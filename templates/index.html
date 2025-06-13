@@ -21,8 +21,13 @@
             <p>정리와 배치를 통해 완성된 공간</p>
         </div>
         <div class="sign">
-            <a href="{{ url_for('login') }}">로그인</a>
-            <a href="{{ url_for('sign_in') }}">회원가입</a>
+            {% if 'user_id' in session %}
+                <a href="#">마이페이지</a>
+                <a href="{{ url_for('logout') }}">로그아웃</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">로그인</a>
+                <a href="{{ url_for('sign_in') }}">회원가입</a>
+            {% endif %}
         </div>
     </header>
     
