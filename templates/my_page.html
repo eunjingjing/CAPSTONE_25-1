@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>로그인 | 이룸</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="title">
+            <a href="{{ url_for('index') }}">이룸</a>
+            <p>정리와 배치를 통해 완성된 공간</p>
+        </div>
+        <div class="sign">
+            {% if 'user_id' in session %}
+                <a href="{{ url_for('my_page') }}">마이페이지</a>
+                <a href="{{ url_for('logout') }}">로그아웃</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">로그인</a>
+                <a href="{{ url_for('sign_in') }}">회원가입</a>
+            {% endif %}
+        </div>
+    </header>
+
+  <div class="mypage-container">
+      {% if records %}
+        <table class="record-table">
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>업로드일</th>
+              <th>정리점수</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in records %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ record.upload_date }}</td>
+              <td>{{ record.score }}점</td>
+              <td>{{ record.comment or "-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <h1 class="no-data">아직 평가 기록이 없습니다.</h1>
+      {% endif %}
+  </div>
+</body>
+</html>

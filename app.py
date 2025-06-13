@@ -33,6 +33,11 @@ def index():
 def find_password():
     return render_template('find_password.html')
 
+# 마이 페이지
+@app.route('/my_page')
+def my_page():
+    return render_template('my_page.html')
+
 # User 모델 생성
 class User(db.Model):
     __tablename__ = '사용자'
