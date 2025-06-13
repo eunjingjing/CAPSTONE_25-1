@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = 'aebeole_secret_key'
 
 # DB 연결
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@localhost:3306/desk'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@15.164.4.130:3306/desk'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -32,6 +32,11 @@ def index():
 @app.route('/find-password')
 def find_password():
     return render_template('find_password.html')
+
+# 마이 페이지
+@app.route('/my_page')
+def my_page():
+    return render_template('my_page.html')
 
 # User 모델 생성
 class User(db.Model):

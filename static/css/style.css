@@ -268,3 +268,34 @@ footer {
   color: #004D4D;
   text-decoration: none;
 }
+
+/* 마이 페이지 css */
+.record-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.record-table th, .record-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: center;
+}
+
+.record-table th {
+  background-color: #004D4D;
+  color: white;
+  font-family: 'Jua';
+}
+
+.mypage-container{
+  padding: 20px;
+  margin: 3vw;
+  background-color: #fff;
+  min-height: 70vh;
+  border-radius: 15px;
+}
+
+.no-data {
+  text-align: center;
+}
