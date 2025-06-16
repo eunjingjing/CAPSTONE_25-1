@@ -3,54 +3,148 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>로그인 | 이룸</title>
+  <title>마이페이지 | 이룸</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .mypage-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+    .record-card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .record-card:hover {
+      transform: translateY(-5px);
+    }
+    .record-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+    .record-card .info {
+      padding: 10px;
+      font-family: 'Noto Sans KR';
+    }
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      width: 400px;
+      text-align: center;
+    }
+    .modal img {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+    .close-btn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #004D4D;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <div class="title">
-            <a href="{{ url_for('index') }}">이룸</a>
-            <p>정리와 배치를 통해 완성된 공간</p>
-        </div>
-        <div class="sign">
-            {% if 'user_id' in session %}
-                <a href="{{ url_for('my_page') }}">마이페이지</a>
-                <a href="{{ url_for('logout') }}">로그아웃</a>
-            {% else %}
-                <a href="{{ url_for('login') }}">로그인</a>
-                <a href="{{ url_for('sign_in') }}">회원가입</a>
-            {% endif %}
-        </div>
-    </header>
+  <header>
+    <div class="title">
+      <a href="{{ url_for('index') }}">이룸</a>
+      <p>정리와 배치를 통해 완성된 공간</p>
+    </div>
+    <div class="sign">
+      {% if 'user_id' in session %}
+          <a href="{{ url_for('my_page') }}">마이페이지</a>
+          <a href="{{ url_for('logout') }}">로그아웃</a>
+      {% else %}
+          <a href="{{ url_for('login') }}">로그인</a>
+          <a href="{{ url_for('sign_in') }}">회원가입</a>
+      {% endif %}
+    </div>
+  </header>
 
   <div class="mypage-container">
-      {% if records %}
-        <table class="record-table">
-          <thead>
-            <tr>
-              <th>번호</th>
-              <th>업로드일</th>
-              <th>정리점수</th>
-              <th>비고</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for record in records %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td>{{ record.upload_date }}</td>
-              <td>{{ record.score }}점</td>
-              <td>{{ record.comment or "-" }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <h1 class="no-data">아직 평가 기록이 없습니다.</h1>
-      {% endif %}
+    {% if records %}
+      {% for record in records %}
+        <div class="record-card" 
+            data-id="{{ record.id }}" 
+            data-img="{{ record.image_path }}" 
+            data-date="{{ record.upload_date }}" 
+            data-score="{{ record.score }}" 
+            data-comment="{{ record.comment }}">
+          <img src="{{ record.image_path }}" alt="업로드 이미지">
+          <div class="info">
+            <div>{{ record.upload_date }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <h1 class="no-data">아직 평가 기록이 없습니다.</h1>
+    {% endif %}
   </div>
+
+
+  <!-- 팝업 모달 -->
+  <div class="modal" id="detailModal">
+    <div class="modal-content">
+      <h2>상세 기록</h2>
+      <img id="modalImage" src="" alt="">
+      <p>업로드일: <span id="modalDate"></span></p>
+      <p>정리점수: <span id="modalScore"></span></p>
+      <p>비고: <span id="modalComment"></span></p>
+      <button class="close-btn" id="closeModal">닫기</button>
+    </div>
+  </div>
+
+  <script>
+    const cards = document.querySelectorAll('.record-card');
+    const modal = document.getElementById('detailModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalDate = document.getElementById('modalDate');
+    const modalScore = document.getElementById('modalScore');
+    const modalComment = document.getElementById('modalComment');
+    const closeModal = document.getElementById('closeModal');
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        modalImage.src = card.dataset.img;
+        modalDate.textContent = card.dataset.date;
+        modalScore.textContent = card.dataset.score + "점";
+        modalComment.textContent = card.dataset.comment;
+        modal.style.display = 'flex';
+      });
+    });
+
+    closeModal.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  </script>
 </body>
 </html>

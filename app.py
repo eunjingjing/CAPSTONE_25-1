@@ -107,7 +107,7 @@ def login():
 
     return render_template('login.html')
 
-# 마이 페이지 라우터
+# 마이페이지 라우터 수정
 @app.route('/my_page')
 def my_page():
     if 'user_id' not in session:
@@ -115,20 +115,111 @@ def my_page():
     
     user_id = session['user_id']
 
-    # 해당 사용자에 대한 추천이력 조회
-    records = Recommendation.query.filter_by(사용자ID=user_id).order_by(Recommendation.추천일시.desc()).all()
+    sql = text("""
+        SELECT 
+            추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
+            이미지.이미지경로
+        FROM 추천이력
+        JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
+        WHERE 추천이력.사용자ID = :user_id
+        ORDER BY 추천이력.추천일시 DESC
+    """)
 
-    # 템플릿으로 넘길 dict 가공 (upload_date, score, comment 형태로 넘김)
-    record_list = [
-        {
-            'upload_date': r.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
-            'score': r.정돈점수,
-            'comment': r.피드백
-        } 
-        for r in records
-    ]
+    result = db.session.execute(sql, {'user_id': user_id})
+    records = result.fetchall()
+
+    record_list = []
+    for row in records:
+        record_list.append({
+            'id': row.추천ID,
+            'image_path': url_for('static', filename=row.이미지경로),
+            'upload_date': row.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
+            'score': row.정돈점수,
+            'comment': row.피드백 if row.피드백 else '-'
+        })
 
     return render_template('my_page.html', records=record_list)
+
+# # 마이 페이지 라우터
+# @app.route('/my_page')
+# def my_page():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+    
+#     user_id = session['user_id']
+
+#     # # 해당 사용자에 대한 추천이력 조회
+#     # records = Recommendation.query.filter_by(사용자ID=user_id).order_by(Recommendation.추천일시.desc()).all()
+
+#     # 추천이력과 이미지 테이블을 조인하여 조회
+#     sql = text("""
+#         SELECT 
+#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
+#             이미지.이미지경로
+#         FROM 추천이력
+#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
+#         WHERE 추천이력.사용자ID = :user_id
+#         ORDER BY 추천이력.추천일시 DESC
+#     """)
+
+#     result = db.session.execute(sql, {'user_id': user_id})
+#     records = result.fetchall()
+
+#     # 템플릿으로 넘길 dict 가공
+#     record_list = [
+#         {
+#             'image_path' : r.이미지경로,
+#             'upload_date': r.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
+#             'score': r.정돈점수,
+#             'comment': r.피드백
+#         } 
+#         for r in records
+#     ]
+
+#     return render_template('my_page.html', records=record_list)
+
+# # ✅ 이미지 경로 변환 (static 경로로 변환용)
+# def convert_image_path(raw_path):
+#     """
+#     DB에는 /home/ec2-user/data/images/1.jpeg 이런 식으로 저장돼있으므로
+#     웹에선 static 접근이 되도록 변환
+#     """
+#     filename = raw_path.split('/')[-1]
+#     return url_for('static', filename='uploads/' + filename)
+
+# # 마이 페이지 라우터 (수정 버전)
+# @app.route('/my_page')
+# def my_page():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+    
+#     user_id = session['user_id']
+
+#     # 추천이력과 이미지 테이블을 조인하여 조회
+#     sql = text("""
+#         SELECT 
+#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
+#             이미지.이미지경로
+#         FROM 추천이력
+#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
+#         WHERE 추천이력.사용자ID = :user_id
+#         ORDER BY 추천이력.추천일시 DESC
+#     """)
+
+#     result = db.session.execute(sql, {'user_id': user_id})
+#     records = result.fetchall()
+
+#     # DB 결과 가공
+#     record_list = []
+#     for row in records:
+#         record_list.append({
+#             'image_path': convert_image_path(row['이미지경로']),
+#             'upload_date': row['추천일시'].strftime('%Y-%m-%d %H:%M:%S'),
+#             'score': row['정돈점수'],
+#             'comment': row['피드백'] if row['피드백'] else '-'
+#         })
+
+#     return render_template('my_page.html', records=record_list)
 
 # 로그아웃 라우터
 @app.route('/logout')
