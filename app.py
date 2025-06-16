@@ -33,11 +33,6 @@ def index():
 def find_password():
     return render_template('find_password.html')
 
-# 마이 페이지
-@app.route('/my_page')
-def my_page():
-    return render_template('my_page.html')
-
 # User 모델 생성
 class User(db.Model):
     __tablename__ = '사용자'
@@ -50,6 +45,17 @@ class User(db.Model):
     사용목적 = db.Column(db.String(100))  # SET 타입은 일단 문자열로 처리 (SET은 ORM이 조금 복잡)
     라이프스타일 = db.Column(db.Enum('맥시멀리스트', '미니멀리스트'))
     자동추천여부 = db.Column(db.Boolean, default=False)
+
+# 추천이력 모델 생성
+class Recommendation(db.Model):
+    __tablename__ = '추천이력'
+    
+    추천ID = db.Column(db.String(40), primary_key=True)
+    사용자ID = db.Column(db.String(30), db.ForeignKey('사용자.사용자ID'))
+    이미지ID = db.Column(db.String(40), nullable=False)
+    정돈점수 = db.Column(db.Integer)
+    피드백 = db.Column(db.Text)
+    추천일시 = db.Column(db.TIMESTAMP)
 
 # 회원가입 라우터
 @app.route('/sign-in', methods=['GET', 'POST'])
@@ -100,6 +106,29 @@ def login():
             return "로그인 실패: 아이디 또는 비밀번호 확인", 401
 
     return render_template('login.html')
+
+# 마이 페이지 라우터
+@app.route('/my_page')
+def my_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+
+    # 해당 사용자에 대한 추천이력 조회
+    records = Recommendation.query.filter_by(사용자ID=user_id).order_by(Recommendation.추천일시.desc()).all()
+
+    # 템플릿으로 넘길 dict 가공 (upload_date, score, comment 형태로 넘김)
+    record_list = [
+        {
+            'upload_date': r.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
+            'score': r.정돈점수,
+            'comment': r.피드백
+        } 
+        for r in records
+    ]
+
+    return render_template('my_page.html', records=record_list)
 
 # 로그아웃 라우터
 @app.route('/logout')
