@@ -2,8 +2,13 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
 
 app = Flask(__name__)
+
+# ✅ 디버깅용 경로 확인 코드
+print("현재 working directory:", os.getcwd())
+print("Flask static folder:", app.static_folder)
 
 # 세션 관리
 app.secret_key = 'aebeole_secret_key'
