@@ -132,7 +132,7 @@ def my_page():
     for row in records:
         record_list.append({
             'id': row.추천ID,
-            'image_path': url_for('static', filename=row.이미지경로),
+            'image_path': row.이미지경로,
             'upload_date': row.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
             'score': row.정돈점수,
             'comment': row.피드백 if row.피드백 else '-'
