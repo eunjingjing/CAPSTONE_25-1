@@ -15,12 +15,13 @@
       <a href="{{ url_for('index') }}" class="to_home">이룸</a>
       <h2>회원가입</h2>
 
-      <form id="signupForm">
-        <input type="text" name="name" placeholder="이름" required><br>
-        <input type="email" name="email" placeholder="이메일" required><br>
-        <input type="text" name="username" placeholder="아이디" required><br>
-        <input type="password" name="password" placeholder="비밀번호" required><br>
-        <input type="password" name="confirm_password" placeholder="비밀번호 확인" required><br>
+      <form id="signupForm" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="name" placeholder="이름" required autocomplete="name"><br>
+        <input type="email" name="email" placeholder="이메일" required autocomplete="email"><br>
+        <input type="text" name="username" placeholder="아이디" required autocomplete="username"><br>
+        <input type="password" name="password" placeholder="비밀번호" required autocomplete="new-password"><br>
+        <input type="password" name="confirm_password" placeholder="비밀번호 확인" required autocomplete="new-password"><br>
         <button type="submit">회원가입</button>
       </form>
 

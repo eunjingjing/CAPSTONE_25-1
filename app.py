@@ -2,21 +2,37 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
+from flask_wtf import CSRFProtect
 import os
 
 app = Flask(__name__)
 
-# ✅ 디버깅용 경로 확인 코드
+# 디버깅용 경로 확인 코드
 print("현재 working directory:", os.getcwd())
 print("Flask static folder:", app.static_folder)
 
-# 세션 관리
-app.secret_key = 'aebeole_secret_key'
+# CSRF 보호 활성화 (app 먼저 생성 후 바로 연결)
+csrf = CSRFProtect(app)
 
-# DB 연결
+# Flask 기본 secret key (세션 및 CSRF 둘 다 이거 사용)
+app.config['SECRET_KEY'] = 'aebeole_secret_key'
+# 반드시 배포시 안전한 키로 교체하기
+
+# 세션 유지 시간 (30분)
+app.permanent_session_lifetime = timedelta(minutes=30)
+
+# 쿠키 보안 설정
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# HTTPS 배포 후 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
+# app.config['SESSION_COOKIE_SECURE'] = True
+
+# DB 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@15.164.4.130:3306/desk'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# DB 초기화
 db = SQLAlchemy(app)
 
 # DB 연결 확인 라우트
@@ -104,6 +120,7 @@ def login():
 
         if user and check_password_hash(user.비밀번호해시, password):
             # 로그인 성공 -> 세션 저장
+            session.permanent = True
             session['user_id'] = user.사용자ID
             session['user_name'] = user.이름
             return redirect(url_for('index'))

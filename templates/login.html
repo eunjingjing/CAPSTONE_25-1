@@ -14,9 +14,10 @@
     <div class="auth-box">
       <a href="{{ url_for('index') }}" class="to_home">이룸</a>
       <h2>로그인</h2>
-      <form method="post" id="loginForm">
-        <input type="text" name="username" placeholder="아이디" required><br>
-        <input type="password" name="password" placeholder="비밀번호" required><br>
+      <form method="post" id="loginForm" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="username" placeholder="아이디" required autocomplete="username"><br>
+        <input type="password" name="password" placeholder="비밀번호" required autocomplete="new-password"><br>
         <button type="submit">로그인</button>
       </form>
       <div class="auth-links">
