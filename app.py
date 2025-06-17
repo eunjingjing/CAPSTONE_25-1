@@ -112,6 +112,12 @@ def login():
 
     return render_template('login.html')
 
+# 로그아웃 라우터
+@app.route('/logout')
+def logout():
+    session.clear()  # 세션 초기화
+    return redirect(url_for('index'))
+
 # 마이페이지 라우터 수정
 @app.route('/my_page')
 def my_page():
@@ -226,11 +232,6 @@ def my_page():
 
 #     return render_template('my_page.html', records=record_list)
 
-# 로그아웃 라우터
-@app.route('/logout')
-def logout():
-    session.clear()  # 세션 초기화
-    return redirect(url_for('index'))
 
 # run
 if __name__ == '__main__':

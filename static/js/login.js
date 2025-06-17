@@ -17,6 +17,6 @@ document.getElementById("loginForm").addEventListener("submit", function(e) {
     })
     .catch(error => {
         console.error("Error:", error);
-        alert("서버 오류 발생");
+        alert("오류 발생");
     });
 });

@@ -23,7 +23,7 @@
         <div class="sign">
             {% if 'user_id' in session %}
                 <a href="{{ url_for('my_page') }}">마이페이지</a>
-                <a href="{{ url_for('logout') }}">로그아웃</a>
+                <a href="#" onclick="handleLogout()">로그아웃</a>
             {% else %}
                 <a href="{{ url_for('login') }}">로그인</a>
                 <a href="{{ url_for('sign_in') }}">회원가입</a>
@@ -101,5 +101,9 @@
     <footer>
         © 2025 Team Ω - Dong-Eui Univ. Computer Science Engineering<br />권민정, 김지원, 이은진<br />AI 기반 맞춤형 책상 정리 시스템 | All rights reserved.
     </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+
 </body>
 </html>

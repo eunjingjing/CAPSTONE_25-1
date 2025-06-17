@@ -76,7 +76,7 @@
     <div class="sign">
       {% if 'user_id' in session %}
           <a href="{{ url_for('my_page') }}">마이페이지</a>
-          <a href="{{ url_for('logout') }}">로그아웃</a>
+          <a href="#" onclick="handleLogout()">로그아웃</a>
       {% else %}
           <a href="{{ url_for('login') }}">로그인</a>
           <a href="{{ url_for('sign_in') }}">회원가입</a>
@@ -146,5 +146,9 @@
       }
     });
   </script>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+
 </body>
 </html>
