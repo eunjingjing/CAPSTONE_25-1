@@ -8,6 +8,10 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from dotenv import load_dotenv
 import os
+import uuid
+import datetime
+from werkzeug.utils import secure_filename
+from recommend import recommend_for_image
 
 # Flask 앱 생성
 app = Flask(__name__)
@@ -198,6 +202,61 @@ def reset_password(token):
 
     return render_template('reset_password.html', token=token)
 
+#배치 추천
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    user_id = session.get('user_id', None)
+    image = request.files['image']  # ✅ 파일은 request.files에서 받아야 함
+    hand = request.form.get('hand')
+    lifestyle = request.form.get('lifestyle')
+    purpose = request.form.get('purpose')
+
+    # 이미지 받기 (폼에서 name="image"인 input에서)
+    image = request.files['image']
+    if not image:
+        return "이미지가 업로드되지 않았습니다.", 400
+
+    # 고유 파일 이름 생성
+    filename = uuid.uuid4().hex + os.path.splitext(image.filename)[-1]
+    upload_path = os.path.join('static/uploads', filename)
+
+    # 이미지 저장
+    image.save(upload_path)
+
+    # YOLO 분석 실행
+    result = recommend_for_image(
+        image_path=upload_path,
+        handedness=hand,
+        user_overrides={
+            "라이프스타일": lifestyle,
+            "사용목적": purpose
+        }
+    )
+
+
+    # 결과 시각화 이미지 저장 (선택)
+    result_img_name = f"result_{filename}"
+    result_img_path = os.path.join('static/results', result_img_name)
+    if 'boxes' in result:
+        from recommend import draw_boxes_and_save  # 너의 시각화 함수
+        draw_boxes_and_save(upload_path, result['boxes'], result_img_path)
+
+    # DB 저장
+    new_rec = Recommendation(
+        추천ID=uuid.uuid4().hex,
+        사용자ID=user_id,
+        이미지ID=filename,
+        정돈점수=result['score'],
+        피드백='\n'.join(result['feedback']),
+        추천일시=datetime.datetime.now()
+    )
+    db.session.add(new_rec)
+    db.session.commit()
+
+    return render_template('recommend_result.html',
+                           result=result,
+                           image_path=result_img_path)
+
 # 마이페이지 라우터
 @app.route('/my_page')
 def my_page():
@@ -230,88 +289,6 @@ def my_page():
         })
 
     return render_template('my_page.html', records=record_list)
-
-# # 마이 페이지 라우터
-# @app.route('/my_page')
-# def my_page():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-    
-#     user_id = session['user_id']
-
-#     # # 해당 사용자에 대한 추천이력 조회
-#     # records = Recommendation.query.filter_by(사용자ID=user_id).order_by(Recommendation.추천일시.desc()).all()
-
-#     # 추천이력과 이미지 테이블을 조인하여 조회
-#     sql = text("""
-#         SELECT 
-#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
-#             이미지.이미지경로
-#         FROM 추천이력
-#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
-#         WHERE 추천이력.사용자ID = :user_id
-#         ORDER BY 추천이력.추천일시 DESC
-#     """)
-
-#     result = db.session.execute(sql, {'user_id': user_id})
-#     records = result.fetchall()
-
-#     # 템플릿으로 넘길 dict 가공
-#     record_list = [
-#         {
-#             'image_path' : r.이미지경로,
-#             'upload_date': r.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
-#             'score': r.정돈점수,
-#             'comment': r.피드백
-#         } 
-#         for r in records
-#     ]
-
-#     return render_template('my_page.html', records=record_list)
-
-# # 이미지 경로 변환 (static 경로로 변환용)
-# def convert_image_path(raw_path):
-#     """
-#     DB에는 /home/ec2-user/data/images/1.jpeg 이런 식으로 저장돼있으므로
-#     웹에선 static 접근이 되도록 변환
-#     """
-#     filename = raw_path.split('/')[-1]
-#     return url_for('static', filename='uploads/' + filename)
-
-# # 마이 페이지 라우터 (수정 버전)
-# @app.route('/my_page')
-# def my_page():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-    
-#     user_id = session['user_id']
-
-#     # 추천이력과 이미지 테이블을 조인하여 조회
-#     sql = text("""
-#         SELECT 
-#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
-#             이미지.이미지경로
-#         FROM 추천이력
-#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
-#         WHERE 추천이력.사용자ID = :user_id
-#         ORDER BY 추천이력.추천일시 DESC
-#     """)
-
-#     result = db.session.execute(sql, {'user_id': user_id})
-#     records = result.fetchall()
-
-#     # DB 결과 가공
-#     record_list = []
-#     for row in records:
-#         record_list.append({
-#             'image_path': convert_image_path(row['이미지경로']),
-#             'upload_date': row['추천일시'].strftime('%Y-%m-%d %H:%M:%S'),
-#             'score': row['정돈점수'],
-#             'comment': row['피드백'] if row['피드백'] else '-'
-#         })
-
-#     return render_template('my_page.html', records=record_list)
-
 
 # run
 if __name__ == '__main__':
