@@ -487,16 +487,6 @@ def recommend_for_image_dummy(image_path: str, handedness: str, user_overrides: 
         "boxes": boxes
     }
 
-# 예시 사용
-test_result = recommend_for_image_dummy(
-    image_path="static/uploads/test.jpg",
-    handedness="오른손잡이",
-    user_overrides={
-        "라이프스타일": "미니멀리스트",
-        "사용목적": "공부"
-    }
-)
-test_result
 
 
 import os
@@ -506,10 +496,11 @@ USE_DUMMY_MODE = True
 
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     if USE_DUMMY_MODE:
-        return recommend_for_image_dummy(...)
-    print("📌 [recommend_for_image] 시작")
-    print(f"📷 입력 이미지 경로: {image_path}")
-    print(f"🧍 사용자 설정 - 손: {handedness}, 가중치: {user_overrides}")
+        return recommend_for_image_dummy(
+            image_path=image_path,
+            handedness=handedness,
+            user_overrides=user_overrides
+        )
 
     try:
         # 1. 모델 로딩
