@@ -205,6 +205,7 @@ def reset_password(token):
 #배치 추천
 @app.route('/recommend', methods=['POST'])
 def recommend():
+    print("🔥 recommend() 호출됨")
     user_id = session.get('user_id', None)
     image = request.files['image']  # ✅ 파일은 request.files에서 받아야 함
     hand = request.form.get('hand')
@@ -232,7 +233,7 @@ def recommend():
             "사용목적": purpose
         }
     )
-
+    print("✅ YOLO 처리 완료")
 
     # 결과 시각화 이미지 저장 (선택)
     result_img_name = f"result_{filename}"
@@ -253,6 +254,7 @@ def recommend():
     db.session.add(new_rec)
     db.session.commit()
 
+    print("✅ DB 저장 완료")
     return render_template('recommend_result.html',
                            result=result,
                            image_path=result_img_path)
