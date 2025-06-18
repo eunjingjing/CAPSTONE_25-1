@@ -37,72 +37,77 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
     
-    <div class="container">
-        <div class="first-layer">
-            <div class="upper-box">
-                <div class="desk-title">책상 사진 첨부</div>
-                <div class="upload-box">
-                    <span class="material-symbols-outlined" style="font-size: 4vw; color: gray;">image</span>
-                    <div style="font-size: 1.5vw; color: gray;">드래그하여 이미지 업로드</div>
-                    <div style="font-size: 1vw; color: gray;">또는</div>
-                    <label class="upload-btn" for="imgUpload">이미지 가져오기</label>
-                    <input type="file" id="imgUpload" accept="image/png, image/jpeg" />
+    <form id="recommendForm" action="/recommend" method="POST" enctype="multipart/form-data">
+        <div class="container">         
+            <div class="first-layer">
+                <div class="upper-box">
+                    <div class="desk-title">책상 사진 첨부</div>
+                    <div class="upload-box">
+                        <span class="material-symbols-outlined" style="font-size: 4vw; color: gray;">image</span>
+                        <div style="font-size: 1.5vw; color: gray;">드래그하여 이미지 업로드</div>
+                        <div style="font-size: 1vw; color: gray;">또는</div>
+                        <label class="upload-btn" for="imgUpload">이미지 가져오기</label>
+                        <input type="file" name="image" id="imgUpload" accept="image/png, image/jpeg, image/jpg" required>
+                    </div>
+                </div>
+
+                <div class="photo-guide">
+                    <div>
+                        <img src="{{ url_for('static', filename='images/right_img.png') }}" alt="올바른 촬영 예시" />
+                        <div><div class = "guide-subtitle">올바른 촬영 방법</div>
+                        • 정면에서 촬영해주세요.<br />• 눈높이에 가깝게 촬영해주세요</div>
+                    </div>
+                    <div>
+                        <img src="{{ url_for('static', filename='images/wrong_img.png') }}" alt="잘못된 촬영 예시" />
+                        <div><div class = "guide-subtitle">잘못된 촬영 방법</div>
+                        • 대각선으로 촬영한 경우<br />• 너무 멀리서 촬영한 경우<br />• 과도하게 아래나 위에서 촬영한 경우</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="photo-guide">
-                <div>
-                    <img src="{{ url_for('static', filename='images/right_img.png') }}" alt="올바른 촬영 예시" />
-                    <div><div class = "guide-subtitle">올바른 촬영 방법</div>
-                    • 정면에서 촬영해주세요.<br />• 눈높이에 가깝게 촬영해주세요</div>
+            <div class="user-setting">
+                <div class="setting-group hand-group">
+                    <span>주로 사용하는 손 (택1)</span><br />
+                    <div class="btn-group">
+                    <button>왼손잡이</button>
+                    <button>오른손잡이</button>
+                    <button>양손잡이</button>
+                    </div>
                 </div>
-                <div>
-                    <img src="{{ url_for('static', filename='images/wrong_img.png') }}" alt="잘못된 촬영 예시" />
-                    <div><div class = "guide-subtitle">잘못된 촬영 방법</div>
-                    • 대각선으로 촬영한 경우<br />• 너무 멀리서 촬영한 경우<br />• 과도하게 아래나 위에서 촬영한 경우</div>
+                <div class="v-line">
+                </div>
+                <div class="setting-group auto">
+                    <div class="setting-group">
+                        <div class="lifestyle-group">
+                            <span>라이프 스타일 (택 1)</span><br />
+                            <div class="btn-group">
+                            <button>맥시멀리스트</button>
+                            <button>미니멀리스트</button>
+                            </div>
+                        </div>
+                        <div class="purpose-group">
+                            <span>사용 용도 (중복 선택 가능)</span><br />
+                            <div class="btn-group">
+                            <button>컴퓨터 / 게임</button>
+                            <button>공부 / 취미</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group auto-btn">
+                        <button>자동 추천</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="user-setting">
-            <div class="setting-group hand-group">
-                <span>주로 사용하는 손 (택1)</span><br />
-                <div class="btn-group">
-                <button>왼손잡이</button>
-                <button>오른손잡이</button>
-                <button>양손잡이</button>
-                </div>
-            </div>
-            <div class="v-line">
-            </div>
-            <div class="setting-group auto">
-                <div class="setting-group">
-                    <div class="lifestyle-group">
-                        <span>라이프 스타일 (택 1)</span><br />
-                        <div class="btn-group">
-                        <button>맥시멀리스트</button>
-                        <button>미니멀리스트</button>
-                        </div>
-                    </div>
-                    <div class="purpose-group">
-                        <span>사용 용도 (중복 선택 가능)</span><br />
-                        <div class="btn-group">
-                        <button>컴퓨터 / 게임</button>
-                        <button>공부 / 취미</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="btn-group auto-btn">
-                    <button>자동 추천</button>
-                </div>
-            </div>
+        <input type="hidden" name="hand" id="handInput" />
+        <input type="hidden" name="lifestyle" id="lifestyleInput" />
+        <input type="hidden" name="purpose" id="purposeInput" />
 
+        <div class="recommend-btn-wrapper">
+            <button type="submit" id="recommendBtn" disabled>배치 추천</button>
         </div>
-    </div>
-
-    <div class="recommend-btn-wrapper">
-        <button id="recommendBtn" disabled>배치 추천</button>
-    </div>
+    </form>
 
     <footer>
         © 2025 Team Ω - Dong-Eui Univ. Computer Science Engineering<br />권민정, 김지원, 이은진<br />AI 기반 맞춤형 책상 정리 시스템 | All rights reserved.
