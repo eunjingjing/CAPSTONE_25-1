@@ -96,6 +96,15 @@ class Recommendation(db.Model):
     피드백 = db.Column(db.Text)
     추천일시 = db.Column(db.TIMESTAMP)
 
+# 이미지 모델 생성
+class Image(db.Model):
+    __tablename__ = '이미지'
+
+    이미지ID = db.Column(db.String(40), primary_key=True)
+    사용자ID = db.Column(db.String(30), nullable=False)
+    이미지경로 = db.Column(db.Text, nullable=False)
+    업로드일시 = db.Column(db.TIMESTAMP)
+
 # 회원가입 라우터
 @app.route('/sign-in', methods=['GET', 'POST'])
 def sign_in():
@@ -243,11 +252,19 @@ def recommend():
         from recommend import draw_boxes_and_save  # 너의 시각화 함수
         draw_boxes_and_save(upload_path, result['boxes'], result_img_path)
 
+    new_image = Image(
+        사용자ID=user_id,
+        이미지경로=result_img_path,
+        업로드일시=datetime.datetime.now()
+    )
+    db.session.add(new_image)
+    db.session.commit()
+    image_id = new_image.이미지ID
+
     # DB 저장
     new_rec = Recommendation(
-        추천ID=uuid.uuid4().hex,
         사용자ID=user_id,
-        이미지ID=filename,
+        이미지ID=image_id,
         정돈점수=result['score'],
         피드백='\n'.join(result['feedback']),
         추천일시=datetime.datetime.now()
