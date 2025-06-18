@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from typing import List, Tuple, Dict, Set, Optional
+import os
 
 # === 클래스명, 그룹, 가중치 등 주요 상수 ===
 CLASS_NAMES = [
@@ -17,8 +18,9 @@ CLASS_NAMES = [
     "tissue", "tower-pc", "trash", "watch"
 ]
 
-WEIGHTS_DF = "data/class_usage_frequency_weight_for_algo.csv"
-WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "data", "class_usage_frequency_weight_for_algo.csv")
+WEIGHTS_DF = pd.read_csv(CSV_PATH)
 
 GROUPS = {
     "books": ["books", "paper", "post-it"],
@@ -322,7 +324,7 @@ def summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdow
             for item in items:
                 print(item)
     print_unique("🧠 [사용자 배치 기준 피드백] 🧠", custom_feedback)
-    print(f"\n👉사용자 선택 : {handed_str}👈")   # <<=== 이 줄 추가!
+    print(f"\n👉사용자 선택 : {handed_str}👈")
     print_unique("🤚 [사용자 맞춤 피드백] 🤚", user_feedback)
     print_unique("📦 [객체 분포 기반 피드백] 📦", fb_group)
     print(f"\n📊 정돈 점수: {score}/100")
@@ -425,7 +427,8 @@ def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str)
 #         print("오류 발생:", e)
 
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
-    model = YOLO("/models/best.pt")
+    MODEL_PATH = os.path.join(BASE_DIR, "models/best.pt")
+    model = YOLO(MODEL_PATH)
     img = load_and_check_image(image_path)
     h, w, _ = img.shape
     objs, results = run_yolo_inference(model, image_path)
