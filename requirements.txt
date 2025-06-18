@@ -12,3 +12,6 @@ requests==2.25.1
 Pillow==11.0.0
 Flask_SQLAlchemy
 pymysql
+Flask-WTF
+Flask-Mail
+python-dotenv
