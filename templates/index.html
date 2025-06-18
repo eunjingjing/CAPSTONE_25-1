@@ -33,11 +33,14 @@
         </div>
     </header>
     
-    <form style="display: none;">
+    <!-- <form style="display: none;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    </form>
+    </form> -->
     
     <form id="recommendForm" action="/recommend" method="POST" enctype="multipart/form-data">
+        
+        {{ csrf_token() }}
+
         <div class="container">         
             <div class="first-layer">
                 <div class="upper-box">
