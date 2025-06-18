@@ -21,6 +21,7 @@ CLASS_NAMES = [
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(BASE_DIR, "data", "class_usage_frequency_weight_for_algo.csv")
 WEIGHTS_DF = pd.read_csv(CSV_PATH)
+WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
 
 GROUPS = {
     "books": ["books", "paper", "post-it"],
@@ -426,31 +427,53 @@ def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str)
 #     except Exception as e:
 #         print("오류 발생:", e)
 
+
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
-    MODEL_PATH = os.path.join(BASE_DIR, "models/best.pt")
-    model = YOLO(MODEL_PATH)
-    img = load_and_check_image(image_path)
-    h, w, _ = img.shape
-    objs, results = run_yolo_inference(model, image_path)
-    if not objs:
-        return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "boxes": []}
+    print("📌 [recommend_for_image] 시작")
+    print(f"📷 이미지 경로: {image_path}")
+    print(f"🧍 사용자 설정 - 손: {handedness}, 추가 가중치: {user_overrides}")
 
-    grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
-    detected_labels = set(label for label, _, _ in object_info)
-    weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
+    try:
+        MODEL_PATH = os.path.join(BASE_DIR, "models/best.pt")
+        print(f"📦 모델 경로: {MODEL_PATH}")
+        model = YOLO(MODEL_PATH)
+        print("✅ 모델 로딩 완료")
 
-    custom_feedback = feedback_custom_rules(label_grid_map, grid_objects, detected_labels)
-    user_feedback = csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map)
-    fb_group = feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels)
-    boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
-    score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
+        img = load_and_check_image(image_path)
+        h, w, _ = img.shape
 
-    return {
-        "score": score,
-        "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
-        "breakdown": breakdown,
-        "boxes": objs  # 바운딩 박스를 저장용으로 사용
-    }
+        objs, results = run_yolo_inference(model, image_path)
+        print(f"🔍 탐지된 객체 수: {len(objs)}")
+        if not objs:
+            return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "boxes": []}
+
+        grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
+        detected_labels = set(label for label, _, _ in object_info)
+        weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
+
+        custom_feedback = feedback_custom_rules(label_grid_map, grid_objects, detected_labels)
+        user_feedback = csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map)
+        fb_group = feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels)
+        boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
+        score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
+
+        print(f"📊 정돈 점수: {score}")
+        return {
+            "score": score,
+            "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
+            "breakdown": breakdown,
+            "boxes": objs  # 바운딩 박스 좌표
+        }
+
+    except Exception as e:
+        print("❌ [recommend_for_image] 오류 발생:", str(e))
+        return {
+            "score": 0,
+            "feedback": [f"⚠️ 분석 중 오류 발생: {str(e)}"],
+            "breakdown": {"시스템 오류": -100},
+            "boxes": []
+        }
+
 
 
 
