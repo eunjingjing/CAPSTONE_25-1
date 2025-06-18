@@ -17,7 +17,7 @@ CLASS_NAMES = [
     "tissue", "tower-pc", "trash", "watch"
 ]
 
-WEIGHTS_DF = pd.read_csv("data\class_usage_frequency_weight_for_algo.csv")
+WEIGHTS_DF = "data/class_usage_frequency_weight_for_algo.csv"
 WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
 
 GROUPS = {
