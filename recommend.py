@@ -428,41 +428,73 @@ def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str)
 #         print("오류 발생:", e)
 
 
+import os
+from ultralytics import YOLO
+
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     print("📌 [recommend_for_image] 시작")
-    print(f"📷 이미지 경로: {image_path}")
-    print(f"🧍 사용자 설정 - 손: {handedness}, 추가 가중치: {user_overrides}")
+    print(f"📷 입력 이미지 경로: {image_path}")
+    print(f"🧍 사용자 설정 - 손: {handedness}, 가중치: {user_overrides}")
 
     try:
+        # 1. 모델 로딩
         MODEL_PATH = os.path.join(BASE_DIR, "models/best.pt")
-        print(f"📦 모델 경로: {MODEL_PATH}")
+        print(f"📦 모델 경로 확인: {MODEL_PATH}")
         model = YOLO(MODEL_PATH)
         print("✅ 모델 로딩 완료")
 
+        # 2. 이미지 로딩
+        print("🖼️ 이미지 로딩 시도")
         img = load_and_check_image(image_path)
+        print("✅ 이미지 로딩 성공")
         h, w, _ = img.shape
+        print(f"📐 이미지 크기: {w} x {h}")
 
+        # 3. YOLO 추론
+        print("🔎 YOLO 추론 시작")
         objs, results = run_yolo_inference(model, image_path)
+        print("✅ YOLO 추론 완료")
         print(f"🔍 탐지된 객체 수: {len(objs)}")
+
         if not objs:
+            print("⚠️ 객체 없음 → 분석 종료")
             return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "boxes": []}
 
+        # 4. 그리드 분석
+        print("🧭 그리드 분석 중...")
         grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
-        detected_labels = set(label for label, _, _ in object_info)
-        weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
+        print("✅ 그리드 분석 완료")
 
+        # 5. 라벨 집합 추출
+        detected_labels = set(label for label, _, _ in object_info)
+        print(f"🏷️ 탐지된 라벨: {detected_labels}")
+
+        # 6. 사용자 가중치 통합
+        weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
+        print("⚖️ 사용자 가중치 반영 완료")
+
+        # 7. 피드백 생성
+        print("💡 피드백 생성 시작")
         custom_feedback = feedback_custom_rules(label_grid_map, grid_objects, detected_labels)
         user_feedback = csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map)
         fb_group = feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels)
-        boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
-        score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
+        print("✅ 피드백 생성 완료")
 
-        print(f"📊 정돈 점수: {score}")
+        # 8. 바운딩 박스 처리
+        boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
+        print(f"📦 바운딩 박스 수: {len(boxes)}")
+
+        # 9. 정돈 점수 산정
+        print("📊 점수 계산 중...")
+        score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
+        print(f"✅ 점수 산정 완료 → {score}")
+
+        # 10. 최종 결과 반환
         return {
             "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
             "breakdown": breakdown,
-            "boxes": objs  # 바운딩 박스 좌표
+            "boxes": objs
         }
 
     except Exception as e:
@@ -473,14 +505,3 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
             "breakdown": {"시스템 오류": -100},
             "boxes": []
         }
-
-
-
-
-# def run_recommendation_for_image():
-#     model = YOLO("/content/drive/MyDrive/yolo_backup/aebeole_V4/weights/best.pt")
-#     image_path = input("정리할 책상 사진 파일 경로를 입력하세요 : ")
-#     user_overrides = {
-#         # 예시: "pen": {"max_acceptable_count": 5, "over_count_penalty": 2}
-#     }
-#     recommend_for_image(image_path, model, user_overrides)
