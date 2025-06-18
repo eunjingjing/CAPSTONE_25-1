@@ -132,4 +132,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 이미지 바뀔 때도 항상 활성화 체크
     fileInput.addEventListener('change', checkReady);
+
+    // 배치 추천 form
+    document.getElementById("recommendBtn").addEventListener("click", () => {
+        // 주 사용 손
+        const hand = document.querySelector(".hand-group .btn-group .active")?.textContent || "";
+
+        // 라이프스타일
+        const lifestyle = document.querySelector(".lifestyle-group .btn-group .active")?.textContent || "";
+
+        // 사용 목적 (중복 가능)
+        const purposeElems = document.querySelectorAll(".purpose-group .btn-group .active");
+        const purposes = [...purposeElems].map(el => el.textContent).join(",");
+
+        // hidden input 채우기
+        document.getElementById("handInput").value = hand;
+        document.getElementById("lifestyleInput").value = lifestyle;
+        document.getElementById("purposeInput").value = purposes;
+
+        document.getElementById("recommendForm").submit();
+    });
 });
