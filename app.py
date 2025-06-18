@@ -224,6 +224,7 @@ def recommend():
     # 이미지 저장
     image.save(upload_path)
 
+    print("✅ YOLO 분석 실행")
     # YOLO 분석 실행
     result = recommend_for_image(
         image_path=upload_path,
