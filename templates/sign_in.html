@@ -15,7 +15,7 @@
       <a href="{{ url_for('index') }}" class="to_home">이룸</a>
       <h2>회원가입</h2>
 
-      <form id="signupForm" autocomplete="off">
+      <form id="signupForm" method="post" action="/sign-in" autocomplete="off">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="text" name="name" placeholder="이름" required autocomplete="name"><br>
         <input type="email" name="email" placeholder="이메일" required autocomplete="email"><br>

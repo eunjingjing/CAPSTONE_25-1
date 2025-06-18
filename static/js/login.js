@@ -1,22 +1,28 @@
-document.getElementById("loginForm").addEventListener("submit", function(e) {
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("loginForm");
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const formData = new FormData(this);
+    const formData = new FormData(form);
 
-    fetch("/login", {
+    try {
+      const response = await fetch("/login", {
         method: "POST",
         body: formData
-    })
-    .then(response => {
-        if (response.ok) {
-            alert("로그인 성공!");
-            window.location.href = "/";
-        } else {
-            alert("아이디 또는 비밀번호가 올바르지 않습니다.");
-        }
-    })
-    .catch(error => {
-        console.error("Error:", error);
-        alert("오류 발생");
-    });
+      });
+
+      const result = await response.json();
+
+      alert(result.message);
+
+      if (result.success) {
+        window.location.href = "/";
+      }
+
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("오류가 발생했습니다.");
+    }
+  });
 });

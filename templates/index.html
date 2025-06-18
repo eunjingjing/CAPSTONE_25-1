@@ -22,14 +22,20 @@
         </div>
         <div class="sign">
             {% if 'user_id' in session %}
-                <a href="{{ url_for('my_page') }}">마이페이지</a>
-                <a href="#" onclick="handleLogout()">로그아웃</a>
+                <a href="{{ url_for('my_page') }}">
+                    {{ session['user_name'] }}님 마이페이지
+                </a>
+                <a href="#" id="logoutBtn">로그아웃</a>
             {% else %}
                 <a href="{{ url_for('login') }}">로그인</a>
                 <a href="{{ url_for('sign_in') }}">회원가입</a>
             {% endif %}
         </div>
     </header>
+    
+    <form style="display: none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
     
     <div class="container">
         <div class="first-layer">

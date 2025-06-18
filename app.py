@@ -1,23 +1,41 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import timedelta
 from flask_wtf import CSRFProtect
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from dotenv import load_dotenv
 import os
 
+# Flask 앱 생성
 app = Flask(__name__)
 
-# 디버깅용 경로 확인 코드
+# .env 불러오기
+load_dotenv()
+
+# Flask 보안 키 설정 (.env에서 가져옴)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
+# Flask-Mail 설정
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+
+# 메일 및 시리얼라이저 초기화
+mail = Mail(app)
+serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+# 디버깅용 경로 출력
 print("현재 working directory:", os.getcwd())
 print("Flask static folder:", app.static_folder)
 
-# CSRF 보호 활성화 (app 먼저 생성 후 바로 연결)
+# CSRF 보호
 csrf = CSRFProtect(app)
-
-# Flask 기본 secret key (세션 및 CSRF 둘 다 이거 사용)
-app.config['SECRET_KEY'] = 'aebeole_secret_key'
-# 반드시 배포시 안전한 키로 교체하기
 
 # 세션 유지 시간 (30분)
 app.permanent_session_lifetime = timedelta(minutes=30)
@@ -25,7 +43,7 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 # 쿠키 보안 설정
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# HTTPS 배포 후 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
+# HTTPS 환경에서만 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
 # app.config['SESSION_COOKIE_SECURE'] = True
 
 # DB 설정
@@ -34,6 +52,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # DB 초기화
 db = SQLAlchemy(app)
+
 
 # DB 연결 확인 라우트
 @app.route('/testdb')
@@ -48,11 +67,6 @@ def testdb():
 @app.route('/')
 def index():
     return render_template('index.html')
-
-# 비밀번호 찾기 페이지
-@app.route('/find-password')
-def find_password():
-    return render_template('find_password.html')
 
 # User 모델 생성
 class User(db.Model):
@@ -87,25 +101,26 @@ def sign_in():
         email = request.form['email']
         name = request.form['name']
         
-        # 중복 아이디 확인
-        existing_user = User.query.filter_by(사용자ID=user_id).first()
-        if existing_user:
-            return "이미 사용 중인 아이디입니다.", 409  # HTTP 409
+        # 아이디 중복 확인
+        if User.query.filter_by(사용자ID=user_id).first():
+            return jsonify({"success": False, "message": "이미 사용 중인 아이디입니다."})
+        
+         # 이메일 중복 확인
+        if User.query.filter_by(이메일=email).first():
+            return jsonify({"success": False, "message": "이미 사용 중인 이메일입니다."})
 
         # 비밀번호 해싱
         hashed_pw = generate_password_hash(password)
-
         new_user = User(
             사용자ID=user_id,
             비밀번호해시=hashed_pw,
             이메일=email,
             이름=name
         )
-
         db.session.add(new_user)
         db.session.commit()
 
-        return '', 200  # 정상 회원가입 시 200 응답
+        return jsonify({"success": True, "message": "회원가입이 완료되었습니다."})
     return render_template('sign_in.html')
 
 # 로그인 라우터
@@ -115,27 +130,75 @@ def login():
         user_id = request.form['username']
         password = request.form['password']
 
-        # DB에서 사용자 검색
         user = User.query.filter_by(사용자ID=user_id).first()
 
         if user and check_password_hash(user.비밀번호해시, password):
-            # 로그인 성공 -> 세션 저장
             session.permanent = True
             session['user_id'] = user.사용자ID
             session['user_name'] = user.이름
-            return redirect(url_for('index'))
-        else:
-            return "로그인 실패: 아이디 또는 비밀번호 확인", 401
+            return jsonify({"success": True, "message": f"{user.이름}님 환영합니다!"})
+
+        return jsonify({"success": False, "message": "로그인 실패: 아이디 또는 비밀번호를 확인해주세요."})
 
     return render_template('login.html')
 
 # 로그아웃 라우터
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
-    session.clear()  # 세션 초기화
-    return redirect(url_for('index'))
+    session.clear()
+    return jsonify({"success": True, "message": "로그아웃 되었습니다."})
 
-# 마이페이지 라우터 수정
+# 비밀번호 찾기 라우터
+@app.route('/find-password', methods=['GET', 'POST'])
+def find_password():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        name = request.form['name']
+
+        user = User.query.filter_by(사용자ID=username, 이메일=email, 이름=name).first()
+
+        if not user:
+            return jsonify({"success": False, "message": "입력하신 정보와 일치하는 계정이 없습니다."})
+
+        token = serializer.dumps(email, salt='reset-password')
+        reset_url = url_for('reset_password', token=token, _external=True)
+
+        msg = Message('이룸 비밀번호 재설정 링크',
+                      recipients=[email],
+                      body=f'비밀번호를 재설정하려면 아래 링크를 클릭하세요:\n{reset_url}\n\n이 링크는 1시간 후 만료됩니다.')
+        mail.send(msg)
+
+        return jsonify({"success": True, "message": "비밀번호 재설정 이메일을 전송했습니다."})
+
+    return render_template('find_password.html')
+
+# 비밀번호 재설정 라우터
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    try:
+        email = serializer.loads(token, salt='reset-password', max_age=3600)
+    except SignatureExpired:
+        return jsonify({"success": False, "message": "링크가 만료되었습니다."})
+    except BadSignature:
+        return jsonify({"success": False, "message": "잘못된 링크입니다."})
+
+    if request.method == 'POST':
+        new_password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        if new_password != confirm_password:
+            return jsonify({"success": False, "message": "비밀번호가 일치하지 않습니다."})
+
+        user = User.query.filter_by(이메일=email).first()
+        user.비밀번호해시 = generate_password_hash(new_password)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "비밀번호가 성공적으로 변경되었습니다."})
+
+    return render_template('reset_password.html', token=token)
+
+# 마이페이지 라우터
 @app.route('/my_page')
 def my_page():
     if 'user_id' not in session:
@@ -206,7 +269,7 @@ def my_page():
 
 #     return render_template('my_page.html', records=record_list)
 
-# # ✅ 이미지 경로 변환 (static 경로로 변환용)
+# # 이미지 경로 변환 (static 경로로 변환용)
 # def convert_image_path(raw_path):
 #     """
 #     DB에는 /home/ec2-user/data/images/1.jpeg 이런 식으로 저장돼있으므로
