@@ -448,12 +448,65 @@ def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str)
 #         summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdown, handed_str)
 #     except Exception as e:
 #         print("오류 발생:", e)
+import os
+import uuid
+import random
+from typing import Dict, List
+
+# 더미 객체 리스트 생성
+def generate_dummy_boxes(num=5) -> List[tuple]:
+    return [(random.randint(100, 200), random.randint(100, 200), random.randint(201, 300), random.randint(201, 300), random.randint(0, 10)) for _ in range(num)]
+
+# YOLO 추론 없이 더미로 recommend_for_image 대체 함수
+def recommend_for_image_dummy(image_path: str, handedness: str, user_overrides: Dict) -> Dict:
+    print("⚠️ recommend_for_image_dummy() 호출됨 - 실제 YOLO 추론은 생략")
+
+    # 더미 정돈 점수
+    score = random.randint(60, 95)
+
+    # 더미 피드백
+    feedback = [
+        "✏️ 펜을 한 곳에 정리해보세요.",
+        "📚 책이 여러 위치에 분산되어 있습니다.",
+        "🧃 음료가 책상에 있습니다. 치우는 것을 추천합니다."
+    ]
+
+    # 더미 감점 항목
+    breakdown = {
+        "책 분산": -10,
+        "음료 존재": -5
+    }
+
+    # 더미 바운딩 박스
+    boxes = generate_dummy_boxes()
+
+    return {
+        "score": score,
+        "feedback": feedback,
+        "breakdown": breakdown,
+        "boxes": boxes
+    }
+
+# 예시 사용
+test_result = recommend_for_image_dummy(
+    image_path="static/uploads/test.jpg",
+    handedness="오른손잡이",
+    user_overrides={
+        "라이프스타일": "미니멀리스트",
+        "사용목적": "공부"
+    }
+)
+test_result
 
 
 import os
 from ultralytics import YOLO
 
+USE_DUMMY_MODE = True
+
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
+    if USE_DUMMY_MODE:
+        return recommend_for_image_dummy(...)
     print("📌 [recommend_for_image] 시작")
     print(f"📷 입력 이미지 경로: {image_path}")
     print(f"🧍 사용자 설정 - 손: {handedness}, 가중치: {user_overrides}")
