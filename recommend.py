@@ -121,9 +121,30 @@ def load_and_check_image(image_path:str) -> np.ndarray:
         raise FileNotFoundError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
     return img
 
-# YOLO 객체 탐지 수행
-def run_yolo_inference(model, image_path:str, conf_thres:float=0.45):
-    results = model(image_path)
+# # YOLO 객체 탐지 수행
+# def run_yolo_inference(model, image_path:str, conf_thres:float=0.45):
+#     results = model(image_path)
+#     boxes = results[0].boxes
+#     objs = [
+#         (*map(int, box), int(cls_id))
+#         for box, cls_id, score in zip(boxes.xyxy, boxes.cls, boxes.conf)
+#         if score >= conf_thres
+#     ]
+#     return objs, results
+import cv2
+import time
+
+def run_yolo_inference(model, image_path: str, conf_thres: float = 0.45):
+    print("🖼️ 이미지 읽는 중...")
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"이미지 로딩 실패: {image_path}")
+
+    print("⏱️ YOLO 추론 시작 (model(img))")
+    t0 = time.time()
+    results = model(img)
+    print(f"✅ YOLO 추론 완료 (소요 시간: {time.time() - t0:.2f}초)")
+
     boxes = results[0].boxes
     objs = [
         (*map(int, box), int(cls_id))
@@ -131,6 +152,7 @@ def run_yolo_inference(model, image_path:str, conf_thres:float=0.45):
         if score >= conf_thres
     ]
     return objs, results
+
 
 # 객체별 위치를 책상 그리드로 변환
 def analyze_objects_by_grid(
