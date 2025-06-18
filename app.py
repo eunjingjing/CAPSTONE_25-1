@@ -253,6 +253,7 @@ def recommend():
         draw_boxes_and_save(upload_path, result['boxes'], result_img_path)
 
     new_image = Image(
+        이미지ID=uuid.uuid4().hex,
         사용자ID=user_id,
         이미지경로=result_img_path,
         업로드일시=datetime.datetime.now()
@@ -263,6 +264,7 @@ def recommend():
 
     # DB 저장
     new_rec = Recommendation(
+        추천ID=uuid.uuid4().hex,
         사용자ID=user_id,
         이미지ID=image_id,
         정돈점수=result['score'],
