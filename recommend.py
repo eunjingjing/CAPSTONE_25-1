@@ -139,7 +139,7 @@ def run_yolo_inference(model, image_path: str, conf_thres: float = 0.45):
 
     print("⏱️ YOLO 추론 시작 (model(img))")
     t0 = time.time()
-    results = model(img)
+    results = model(img, imgsz=320, device='cpu')
     print(f"✅ YOLO 추론 완료 (소요 시간: {time.time() - t0:.2f}초)")
 
     boxes = results[0].boxes
