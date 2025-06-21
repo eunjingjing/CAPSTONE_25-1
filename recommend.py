@@ -1,14 +1,17 @@
+import os
 import cv2
+import time
+import uuid
+import random
 import numpy as np
-from ultralytics import YOLO
-from collections import defaultdict, Counter
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from collections import defaultdict, Counter
+from ultralytics import YOLO
 from typing import List, Tuple, Dict, Set, Optional
-import os
 
-# === 클래스명, 그룹, 가중치 등 주요 상수 ===
+# ===================== 설정 및 상수 =====================
 CLASS_NAMES = [
     "bag", "books", "bookshelf", "calendar", "correction-tape", "cosmetic",
     "drink", "earphone", "eraser", "food", "gamepad", "glasses", "glue", "goods",
@@ -18,11 +21,6 @@ CLASS_NAMES = [
     "tissue", "tower-pc", "trash", "watch"
 ]
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(BASE_DIR, "data", "class_usage_frequency_weight_for_algo.csv")
-WEIGHTS_DF = pd.read_csv(CSV_PATH)
-WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
-
 GROUPS = {
     "books": ["books", "paper", "post-it"],
     "stationery": ["pen", "pencil case", "scissors", "glue", "tape", "eraser", "stapler", "correction-tape", "pen holder", "ruler"],
@@ -31,9 +29,17 @@ GROUPS = {
     "personal": ["glasses", "cosmetic", "bag", "watch"],
     "photo": ["photo"],
     "calendar": ["calendar"],
-    "goods": ["goods"],
+    "goods": ["goods"]
 }
 
+EXCLUDE_CLASSES_BACKGROUND = {"monitor-pc", "photo", "goods", "post-it"}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "data", "class_usage_frequency_weight_for_algo.csv")
+WEIGHTS_DF = pd.read_csv(CSV_PATH)
+WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
+
+
+# ===================== 유틸 함수 =====================
 # === 책상 영역 추출 ===
 def get_desk_top_dynamic(
     objs: List[Tuple[int,int,int,int,int]], 
@@ -72,7 +78,7 @@ EXCLUDE_CLASSES_BACKGROUND = {
     "monitor-pc", "photo", "goods", "post-it"
 }
 
-# === 책상 영역(그리드) 정의 및 한글 변환 ===
+# === 책상 그리드(3X4)) 정의 및 한글 변환 ===
 def create_grid_map(rows:int=3, cols:int=4) -> Tuple[Dict[str, List[Tuple[int,int]]], Dict[str, str]]:
     region_map = {
         "left_side": [(r,0) for r in range(rows)],
@@ -106,15 +112,6 @@ def get_region(grid:Tuple[int,int]) -> str:
             return region
     return "center"
 
-def get_user_handedness() -> str:
-    while True:
-        hand = input("당신은 오른손잡이인가요? (y/n): ").strip().lower()
-        if hand in ('y', 'n'):
-            handed_str = "오른손잡이" if hand == 'y' else "왼손잡이"
-            print(f"\n사용자 선택 : {handed_str}")
-            return hand
-        print("y 또는 n으로 입력해주세요.")
-
 def load_and_check_image(image_path:str) -> np.ndarray:
     img = cv2.imread(image_path)
     if img is None:
@@ -131,9 +128,8 @@ def load_and_check_image(image_path:str) -> np.ndarray:
 #         if score >= conf_thres
 #     ]
 #     return objs, results
-import cv2
-import time
 
+## 디버깅 추가된 버전
 def run_yolo_inference(model, image_path: str, conf_thres: float = 0.45):
     print("🖼️ 이미지 읽는 중...")
     img = cv2.imread(image_path)
@@ -152,7 +148,6 @@ def run_yolo_inference(model, image_path: str, conf_thres: float = 0.45):
         if score >= conf_thres
     ]
     return objs, results
-
 
 # 객체별 위치를 책상 그리드로 변환
 def analyze_objects_by_grid(
@@ -193,7 +188,7 @@ def compute_overlap_penalty(boxes:List[List[float]], threshold:float=0.6) -> int
     return min(heavy_overlap * 2, 20)
 
 # 유저 맞춤 가중치 반영
-def get_user_weights(default_map:dict, user_overrides:Optional[dict]=None) -> dict:
+def get_user_weights(default_map:dict, user_overrides:Optional[list]=None) -> dict:
     if not user_overrides:
         return default_map
     merged = {k: v.copy() for k, v in default_map.items()}
@@ -227,10 +222,14 @@ def compute_organization_score(label_grid_map, boxes, weights_map) -> Tuple[int,
 
 # 손잡이 방향에 따른 맞춤 피드백
 def csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map):
-    weight_col = "right_handed_weight" if handedness == "y" else "left_handed_weight"
-    region_for_col = "right_side" if handedness == "y" else "left_side"
-    region_kr = region_to_kr(region_for_col)
     feedback = []
+    if handedness == "양손잡이":
+        return feedback
+    
+    weight_col = "right_handed_weight" if handedness == "오른손잡이" else "left_handed_weight"
+    region_for_col = "right_side" if handedness == "오른손잡이" else "left_side"
+    region_kr = region_to_kr(region_for_col)
+
     for label in detected_labels:
         info = weights_map.get(label, {})
         handed_weight = info.get(weight_col, 0)
@@ -315,30 +314,6 @@ def feedback_custom_rules(label_grid_map, grid_objects, detected_labels):
                         feedback.append(f"🕒 '{label}'은 calendar가 있는 {cal_region} 쪽에 같이 두는 걸 추천해요.")
     return list(dict.fromkeys(feedback))
 
-# 박스 컬러 고정
-def fixed_color(cls_id:int):
-    np.random.seed(cls_id)
-    return tuple(np.random.uniform(0.2, 0.8, 3))
-
-# 박스 시각화(Matplotlib)
-def draw_boxes_matplotlib(img:np.ndarray, objs:List[Tuple[int]], class_names:List[str], scores:Optional[List[float]]=None):
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-    ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    for i, (x1, y1, x2, y2, cls_id) in enumerate(objs):
-        color = fixed_color(cls_id)
-        rect = patches.Rectangle((x1, y1), x2 - x1, y2 - y1,
-                                 linewidth=2, edgecolor=color, facecolor='none')
-        ax.add_patch(rect)
-        label = class_names[cls_id]
-        text = f"{label}"
-        if scores is not None:
-            text += f" {scores[i]:.2f}"
-        ax.text(x1, y1 - 5, text, fontsize=10, color=color, weight='bold',
-                bbox=dict(facecolor='none', edgecolor=color, boxstyle='round,pad=0.2', lw=1))
-    ax.axis('off')
-    plt.tight_layout(pad=0)
-    plt.show()
-
 # 피드백 요약 출력
 def summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdown, handed_str):
     def print_unique(title, items):
@@ -355,58 +330,6 @@ def summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdow
         if v != 0:
             print(f"  - {k}: {v}")
 
-def draw_objects_with_boxes(
-    img: np.ndarray,
-    objs: List[Tuple[int]],
-    class_names: List[str]
-):
-    """
-    객체 바운딩 박스와 라벨만 시각화합니다. (그리드 없이)
-    """
-    img_disp = img.copy()
-
-    for (x1, y1, x2, y2, cls_id) in objs:
-        color = (0, 180, 255)
-
-        # 바운딩 박스
-        cv2.rectangle(img_disp, (x1, y1), (x2, y2), color, thickness=4)
-
-        # 라벨 - 외곽선(검정)
-        cv2.putText(
-            img_disp, class_names[cls_id],
-            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 6, cv2.LINE_AA
-        )
-        # 라벨 - 내부(흰색)
-        cv2.putText(
-            img_disp, class_names[cls_id],
-            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3, cv2.LINE_AA
-        )
-
-    # 시각화
-    plt.figure(figsize=(12, 8))
-    plt.imshow(cv2.cvtColor(img_disp, cv2.COLOR_BGR2RGB))
-    plt.title("Detected Object Bounding Boxes", fontsize=18)
-    plt.axis("off")
-    plt.show()
-
-def visualize_grid_and_centers(img, objs, class_names, desk_left, desk_top, desk_right, desk_bottom, grid_coords):
-    fig, ax = plt.subplots(1, 1, figsize=(12, 10))
-    ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-
-    for (r, c), (x1, y1, x2, y2) in grid_coords.items():
-        grid_rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1.5, edgecolor='lime', facecolor='none', linestyle='--')
-        ax.add_patch(grid_rect)
-
-    for (x1, y1, x2, y2, cls_id) in objs:
-        cx, cy = (x1+x2)//2, (y1+y2)//2
-        color = np.random.rand(3,)
-        ax.plot(cx, cy, 'o', color=color, markersize=8)
-        ax.text(cx+5, cy-10, class_names[cls_id], color=color, fontsize=10, weight='bold')
-
-    ax.set_title("Desk Area + Grid + Object Centers", fontsize=16)
-    plt.axis("off")
-    plt.show()
-
 # 객체 탐지 결과 이미지 저장 경로
 def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str):
     """
@@ -420,34 +343,6 @@ def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str)
         cv2.putText(img, CLASS_NAMES[cls_id], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3, cv2.LINE_AA)
     cv2.imwrite(output_path, img)
 
-
-# # 메인 프로세스: 1) 탐지 → 2) 분석 → 3) 피드백 → 4) 시각화
-# def recommend_for_image(image_path:str, model, user_overrides:Optional[dict]=None):
-#     try:
-#         handedness = get_user_handedness()
-#         handed_str = "오른손잡이" if handedness == "y" else "왼손잡이"
-#         img = load_and_check_image(image_path)
-#         h, w, _ = img.shape
-#         objs, results = run_yolo_inference(model, image_path)
-#         if not objs:
-#             print("인식된 객체가 없습니다.")
-#             return
-#         scores = [float(s.item()) if hasattr(s, "item") else float(s) for s in results[0].boxes.conf]
-#         draw_boxes_matplotlib(img, objs, CLASS_NAMES, scores)
-#         print('YOLO 결과:', [CLASS_NAMES[int(cls_id)] for cls_id in results[0].boxes.cls])
-#         draw_objects_with_boxes(img, objs, CLASS_NAMES)
-#         grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
-#         detected_labels = set(label for label, _, _ in object_info)
-#         print('detected_labels:', detected_labels)
-#         weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
-#         custom_feedback = feedback_custom_rules(label_grid_map, grid_objects, detected_labels)
-#         user_feedback = csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map)
-#         fb_group = feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels)
-#         boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
-#         score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
-#         summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdown, handed_str)
-#     except Exception as e:
-#         print("오류 발생:", e)
 import os
 import uuid
 import random
@@ -489,10 +384,9 @@ def recommend_for_image_dummy(image_path: str, handedness: str, user_overrides: 
 
 
 
-import os
-from ultralytics import YOLO
 
-USE_DUMMY_MODE = True
+
+USE_DUMMY_MODE = False
 
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     if USE_DUMMY_MODE:
@@ -555,12 +449,17 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
         print(f"✅ 점수 산정 완료 → {score}")
 
+        result_img_name = os.path.basename(image_path)
+        result_img_path = os.path.join("static/images", result_img_name)
+
+        draw_boxes_and_save(image_path, objs, result_img_path)
+        
         # 10. 최종 결과 반환
         return {
             "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
             "breakdown": breakdown,
-            "boxes": objs
+            "image_path": result_img_path
         }
 
     except Exception as e:

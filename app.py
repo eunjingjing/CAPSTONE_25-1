@@ -245,17 +245,10 @@ def recommend():
     )
     print("✅ YOLO 처리 완료")
 
-    # 결과 시각화 이미지 저장 (선택)
-    result_img_name = f"result_{filename}"
-    result_img_path = os.path.join('static/results', result_img_name)
-    if 'boxes' in result:
-        from recommend import draw_boxes_and_save  # 너의 시각화 함수
-        draw_boxes_and_save(upload_path, result['boxes'], result_img_path)
-
     new_image = Image(
         이미지ID=uuid.uuid4().hex,
         사용자ID=user_id,
-        이미지경로=result_img_path,
+        이미지경로=result['image_path'],
         업로드일시=datetime.datetime.now()
     )
     db.session.add(new_image)
@@ -277,7 +270,7 @@ def recommend():
     print("✅ DB 저장 완료")
     return render_template('recommend_result.html',
                            result=result,
-                           image_path=result_img_path)
+                           image_path=result['image_path'])
 
 # 마이페이지 라우터
 @app.route('/my_page')
