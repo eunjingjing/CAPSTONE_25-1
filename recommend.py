@@ -401,7 +401,8 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         # 1. 모델 로딩
         MODEL_PATH = os.path.join(BASE_DIR, "models/weights/best.pt")
         print(f"📦 모델 경로 확인: {MODEL_PATH}")
-        model = torch.hub.load(MODEL_PATH)
+        # model = YOLO(MODEL_PATH)
+        model = YOLO("yolov8s.pt")
         print("✅ 모델 로딩 완료")
 
         # 2. 이미지 로딩
