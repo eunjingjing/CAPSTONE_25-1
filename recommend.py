@@ -465,9 +465,8 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
     except Exception as e:
         print("❌ [recommend_for_image] 오류 발생:", str(e))
-        return {
-            "score": 0,
-            "feedback": [f"⚠️ 분석 중 오류 발생: {str(e)}"],
-            "breakdown": {"시스템 오류": -100},
-            "image_path": result_img_path
-        }
+        return recommend_for_image_dummy(
+            image_path=image_path,
+            handedness=handedness,
+            user_overrides=user_overrides
+        )
