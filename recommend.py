@@ -469,5 +469,5 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
             "score": 0,
             "feedback": [f"⚠️ 분석 중 오류 발생: {str(e)}"],
             "breakdown": {"시스템 오류": -100},
-            "boxes": []
+            "image_path": result_img_path
         }
