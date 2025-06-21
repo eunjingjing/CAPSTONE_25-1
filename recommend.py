@@ -380,7 +380,7 @@ def recommend_for_image_dummy(image_path: str, handedness: str, user_overrides: 
         "score": score,
         "feedback": feedback,
         "breakdown": breakdown,
-        "boxes": boxes
+        "image_path": image_path
     }
 
 
