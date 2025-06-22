@@ -7,4 +7,9 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
-models/
+models/__pycache__/
+*.pyc
+env/
+.env
+static/uploads/
+nohup.out

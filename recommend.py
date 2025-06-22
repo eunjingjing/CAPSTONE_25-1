@@ -1,14 +1,9 @@
 import os
 import cv2
 import time
-import uuid
-import random
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from collections import defaultdict, Counter
-import torch
 from ultralytics import YOLO
 from typing import List, Tuple, Dict, Set, Optional
 
@@ -26,16 +21,22 @@ GROUPS = {
     "books": ["books", "paper", "post-it"],
     "stationery": ["pen", "pencil case", "scissors", "glue", "tape", "eraser", "stapler", "correction-tape", "pen holder", "ruler"],
     "it": ["laptop", "keyboard-pc", "monitor-pc", "mouse-pc", "tablet-pc", "mic-pc", "headset", "speakers-pc", "tower-pc", "gamepad", "phone", "earphone"],
-    "trash": ["food", "drink", "tissue", "trash"],
+    "trash": ["food", "drink", "trash", "snack"],
     "personal": ["glasses", "cosmetic", "bag", "watch"],
     "photo": ["photo"],
     "calendar": ["calendar"],
     "goods": ["goods"]
 }
 
+STUDY_OBJECTS = {"books", "pen", "ruler", "eraser", "glue", "paper", "post-it", 
+                 "tape", "scissors", "stapler", "stopwatch", "tablet-pc", "correction-tape"}
+COMPUTER_OBJECTS = {"monitor-pc", "keyboard-pc", "mouse-pc", "laptop", "tablet-pc", 
+                    "headset", "mic-pc", "speakers-pc", "tower-pc"}
+
+
 EXCLUDE_CLASSES_BACKGROUND = {"monitor-pc", "photo", "goods", "post-it"}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(BASE_DIR, "data", "class_usage_frequency_weight_for_algo.csv")
+CSV_PATH = os.path.join(BASE_DIR, "data", "classes_weights.csv")
 WEIGHTS_DF = pd.read_csv(CSV_PATH)
 WEIGHTS_MAP = WEIGHTS_DF.set_index("class").to_dict(orient="index")
 
@@ -75,11 +76,7 @@ def get_desk_top_dynamic(
     desk_top = max(0, avg_cy - margin)
     return desk_top
 
-EXCLUDE_CLASSES_BACKGROUND = {
-    "monitor-pc", "photo", "goods", "post-it"
-}
-
-# === 책상 그리드(3X4)) 정의 및 한글 변환 ===
+# === 책상 그리드(3X4) 정의 및 한글 변환 ===
 def create_grid_map(rows:int=3, cols:int=4) -> Tuple[Dict[str, List[Tuple[int,int]]], Dict[str, str]]:
     region_map = {
         "left_side": [(r,0) for r in range(rows)],
@@ -96,22 +93,15 @@ def create_grid_map(rows:int=3, cols:int=4) -> Tuple[Dict[str, List[Tuple[int,in
     return region_map, region_kr
 
 REGION_MAP, REGION_KR = create_grid_map(3, 4)
-# HANDED_SENSITIVE_CLASSES = {"drink", "mouse-pc", "pen", "scissors", "stapler"}
+
+def get_region_key_from_grid(grid: Tuple[int, int]) -> str:
+    for region_key, grids in REGION_MAP.items():
+        if grid in grids:
+            return region_key
+    return "unknown"
 
 def region_to_kr(region:str) -> str:
     return REGION_KR.get(region, region)
-
-def get_region(grid:Tuple[int,int]) -> str:
-    for region, grids in REGION_MAP.items():
-        if grid in grids:
-            return region
-    # 인접 영역 자동 선택
-    all_grids = [g for grids in REGION_MAP.values() for g in grids]
-    closest = min(all_grids, key=lambda g: abs(g[0]-grid[0]) + abs(g[1]-grid[1]))
-    for region, grids in REGION_MAP.items():
-        if closest in grids:
-            return region
-    return "center"
 
 def load_and_check_image(image_path:str) -> np.ndarray:
     img = cv2.imread(image_path)
@@ -119,18 +109,6 @@ def load_and_check_image(image_path:str) -> np.ndarray:
         raise FileNotFoundError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
     return img
 
-# # YOLO 객체 탐지 수행
-# def run_yolo_inference(model, image_path:str, conf_thres:float=0.45):
-#     results = model(image_path)
-#     boxes = results[0].boxes
-#     objs = [
-#         (*map(int, box), int(cls_id))
-#         for box, cls_id, score in zip(boxes.xyxy, boxes.cls, boxes.conf)
-#         if score >= conf_thres
-#     ]
-#     return objs, results
-
-## 디버깅 추가된 버전
 def run_yolo_inference(model, image_path: str, conf_thres: float = 0.45):
     print("🖼️ 이미지 읽는 중...")
     img = cv2.imread(image_path)
@@ -173,12 +151,76 @@ def analyze_objects_by_grid(
         object_info.append((label, grid, (cx, cy)))
     return grid_objects, label_grid_map, object_info
 
-# 객체 겹침(중복) 감점
-def compute_overlap_penalty(boxes:List[List[float]], threshold:float=0.6) -> int:
+def compute_recommendations(
+    detected_labels: List[str],
+    weights_df: pd.DataFrame,
+    handedness: str,
+    lifestyle: str,
+    usage: List[str],
+    rows: int = 3,
+    cols: int = 4
+) -> Dict[str, str]:
+    weights_df = weights_df.set_index("class")
+    region_objects = {region_key: [] for region_key in REGION_MAP.keys()}
+    base_position_weight = np.zeros((rows, cols))
+
+    for y in range(rows):
+        for x in range(cols):
+            x_score = -abs(x - 1.5) + 1.5
+            y_score = y
+            base_position_weight[y, x] = x_score + y_score
+
+    recommendations = {}
+
+    for label in detected_labels:
+        row = weights_df.loc[label]
+        if row["base_importance"] == 0:
+            recommendations[label] = f"'{label}'은(는) 책상 위에 올려둘 필요가 없어요. 치워주세요!"
+            continue
+
+        # 손잡이 반영: 우측 선호 또는 좌측 선호에 따라 열 가중치 차등
+        hand_bias = [0, 0, 0, 0]
+        if row["hand_sensitive"]:
+            if handedness == "왼손잡이":
+                hand_bias = [0, 0.2, 0.5, 1.0]
+            elif handedness == "오른손잡이":
+                hand_bias = [1.0, 0.5, 0.2, 0]
+
+        # 사용 용도 반영
+        usage_bonus = 0
+        if "공부 / 취미" in usage and row["base_importance"] <= 2:
+            usage_bonus = 0.5
+        elif "컴퓨터 / 게임" in usage and row["base_importance"] >= 3:
+            usage_bonus = 1.0
+
+        # 위치별 점수 계산
+        position_matrix = np.copy(base_position_weight)
+        for y in range(rows):
+            for x in range(cols):
+                region_key = get_region_key_from_grid((y, x))
+                score = position_matrix[y, x]
+                score *= (1 + 0.3 * row["x_weight"] + 0.3 * row["y_weight"])  # 위치 선호 반영
+                score += hand_bias[x] + usage_bonus + row["base_importance"]
+                clutter_penalty = len(region_objects[region_key]) * (2.0 if lifestyle == "미니멀리스트" else 0.8)
+                score -= clutter_penalty
+                position_matrix[y, x] = score
+
+        best_y, best_x = np.unravel_index(np.argmax(position_matrix), position_matrix.shape)
+        best_region_key = get_region_key_from_grid((best_y, best_x))
+        best_region_kr = REGION_KR[best_region_key]
+        region_objects[best_region_key].append(label)
+
+        recommendations[label] = f"'{label}'은(는) 책상 {best_region_kr}에 두는 게 좋아 보여요!"
+
+    return recommendations
+
+# 고도화된 정돈 점수 산정 함수: 그룹별 균형, 책 분산, 중요도 우선 배치, 중심 혼잡도, 겹침 등 반영
+def compute_overlap_penalty(boxes: List[List[float]], threshold: float = 0.6) -> int:
     heavy_overlap = 0
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
-            xi1, yi1, xi2, yi2 = max(boxes[i][0], boxes[j][0]), max(boxes[i][1], boxes[j][1]), min(boxes[i][2], boxes[j][2]), min(boxes[i][3], boxes[j][3])
+            xi1, yi1 = max(boxes[i][0], boxes[j][0]), max(boxes[i][1], boxes[j][1])
+            xi2, yi2 = min(boxes[i][2], boxes[j][2]), min(boxes[i][3], boxes[j][3])
             inter_area = max(0, xi2 - xi1) * max(0, yi2 - yi1)
             box1_area = (boxes[i][2] - boxes[i][0]) * (boxes[i][3] - boxes[i][1])
             box2_area = (boxes[j][2] - boxes[j][0]) * (boxes[j][3] - boxes[j][1])
@@ -188,21 +230,18 @@ def compute_overlap_penalty(boxes:List[List[float]], threshold:float=0.6) -> int
                 heavy_overlap += 1
     return min(heavy_overlap * 2, 20)
 
-# 유저 맞춤 가중치 반영
-def get_user_weights(default_map:dict, user_overrides:Optional[list]=None) -> dict:
-    if not user_overrides:
-        return default_map
-    merged = {k: v.copy() for k, v in default_map.items()}
-    for k, v in user_overrides.items():
-        if k in merged:
-            merged[k].update(v)
-        else:
-            merged[k] = v
-    return merged
+def compute_organization_score(
+    label_grid_map: Dict[str, List[Tuple[int, int]]],
+    boxes: List[List[float]],
+    weights_map: Dict[str, dict],
+    rows: int = 3,
+    cols: int = 4
+) -> Tuple[int, Dict[str, int]]:
 
-# 정돈 점수 산정
-def compute_organization_score(label_grid_map, boxes, weights_map) -> Tuple[int,dict]:
-    score, breakdown = 100, {}
+    score = 100
+    breakdown = {}
+
+    # 1. 과다 배치 패널티
     for label, info in weights_map.items():
         max_count = info.get("max_acceptable_count", None)
         over_penalty = info.get("over_count_penalty", 5)
@@ -212,206 +251,118 @@ def compute_organization_score(label_grid_map, boxes, weights_map) -> Tuple[int,
                 penalty = (count - max_count) * over_penalty
                 score -= penalty
                 breakdown[f"{label} 과다"] = -penalty
-    if len(set(label_grid_map.get("books", []))) >= 3:
+
+    # 2. 책 분산 감점
+    if "books" in label_grid_map and len(set(label_grid_map["books"])) >= 3:
         score -= 20
         breakdown["책 분산"] = -20
+
+    # 3. 중심 혼잡도 패널티
+    center_cells = [(1,1), (1,2), (2,1), (2,2)]
+    center_count = sum([
+        len(label_grid_map.get(label, []))
+        for label in label_grid_map
+        for grid in label_grid_map[label]
+        if grid in center_cells
+    ])
+    if center_count >= 6:
+        score -= 10
+        breakdown["중심 혼잡"] = -10
+
+    # 4. 중요도 높은 객체가 외곽에 있을 경우 감점
+    for label, grids in label_grid_map.items():
+        if label in weights_map and weights_map[label].get("base_importance", 0) >= 4:
+            for grid in grids:
+                if grid in [(0,0), (0,3), (2,0), (2,3)]:
+                    score -= 5
+                    breakdown[f"{label} 위치 부적절"] = -5
+                    break
+
+    # 5. 그룹 균형 점검 (stationery)
+    stationery_labels = [
+        "pen", "pencil case", "scissors", "glue", "tape", "eraser", "stapler",
+        "correction-tape", "pen holder", "ruler"
+    ]
+    counter = Counter()
+    for label in stationery_labels:
+        for grid in label_grid_map.get(label, []):
+            counter[grid] += 1
+    if len(counter) >= 4:
+        score -= 8
+        breakdown["문구류 흩어짐"] = -8
+
+    # 6. 겹침 패널티
     overlap_penalty = compute_overlap_penalty(boxes)
     if overlap_penalty > 0:
+        score -= overlap_penalty
         breakdown["객체 겹침 감점"] = -overlap_penalty
-    score -= overlap_penalty
+
     return max(score, 0), breakdown
 
-# 손잡이 방향에 따른 맞춤 피드백
-def csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map):
-    feedback = []
-    if handedness == "양손잡이":
-        return feedback
+# 책상 그리드 시각화 함수 (동적 책상 영역 할당 기반)
+def visualize_desk_grid(
+    image_path: str,
+    objs: List[Tuple[int, int, int, int, int]],
+    rows: int = 3,
+    cols: int = 4
+) -> str:
+    img = cv2.imread(image_path)
+    h, w, _ = img.shape
+    desk_top = get_desk_top_dynamic(objs, exclude_classes=EXCLUDE_CLASSES_BACKGROUND, class_names=CLASS_NAMES, img_h=h)
     
-    weight_col = "right_handed_weight" if handedness == "오른손잡이" else "left_handed_weight"
-    region_for_col = "right_side" if handedness == "오른손잡이" else "left_side"
-    region_kr = region_to_kr(region_for_col)
+    # 저장 경로를 자동 생성
+    filename = os.path.basename(image_path)
+    output_path = os.path.join("/home/ec2-user/my-project/static/images", filename)
+    
+    desk_bottom = h
+    cell_w = w // cols
+    cell_h = (desk_bottom - desk_top) // rows
 
-    for label in detected_labels:
-        info = weights_map.get(label, {})
-        handed_weight = info.get(weight_col, 0)
-        if handed_weight >= 1:
-            wrong_regions = []
-            for grid in label_grid_map.get(label, []):
-                cur_region = get_region(grid)
-                if cur_region != region_for_col:
-                    wrong_regions.append(region_to_kr(cur_region))
-            n_wrong = len(wrong_regions)
-            if n_wrong == 0:
-                continue
-            wrong_regions_text = ", ".join(sorted(set(wrong_regions)))
-            plural = f"{n_wrong}개의" if n_wrong > 1 else "1개의"
-            feedback.append(
-                f"👉 {plural} '{label}'이(가) {wrong_regions_text}에 있습니다. 모두 {region_kr}으로 옮겨보세요."
-            )
-    return feedback
+    region_cells = {
+        "top": [(0, 1), (0, 2)],
+        "left": [(0, 0), (1, 0), (2, 0)],
+        "right": [(0, 3), (1, 3), (2, 3)],
+        "center": [(1, 1), (1, 2), (2, 1), (2, 2)]
+    }
+    region_colors = {
+        "top": (255, 204, 204),
+        "left": (204, 229, 255),
+        "right": (204, 255, 229),
+        "center": (255, 255, 204)
+    }
 
-# 그룹 단위(책 등) 분산/집중 피드백
-def feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels):
-    feedback = []
-    if "books" in detected_labels:
-        book_grids = set(label_grid_map.get("books", []))
-        if len(book_grids) >= 3:
-            feedback.append("📚 책이 여러 영역에 흩어져 있습니다. 한 쪽으로 정리해 보세요.")
-        else:
-            feedback.append("📚 책/노트류 정리가 잘 되어 있습니다!")
-    if any(lab in detected_labels for lab in ["drink", "tissue", "trash"]):
-        feedback.append("🗑️ 책상에 쓰레기/음료가 조금 있습니다. 필요 없는 건 바로 치우면 더 깨끗해져요.")
-    return list(dict.fromkeys(feedback))
+    # 각 셀 채우기
+    for region, cells in region_cells.items():
+        for (r, c) in cells:
+            pt1 = (c * cell_w, desk_top + r * cell_h)
+            pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
+            cv2.rectangle(img, pt1, pt2, region_colors[region], thickness=-1)
 
-# 기타(자주 어지르는 패턴, 권장 배치 등) 커스텀 피드백
-def feedback_custom_rules(label_grid_map, grid_objects, detected_labels):
-    feedback = []
-    grid_counter = Counter()
-    for label in GROUPS["stationery"]:
-        if label not in detected_labels:
-            continue
-        for g in label_grid_map.get(label, []):
-            grid_counter[g] += 1
-    if grid_counter:
-        common_grid, _ = grid_counter.most_common(1)[0]
-        common_region = region_to_kr(get_region(common_grid))
-        for label in GROUPS["stationery"]:
-            if label not in detected_labels:
-                continue
-            for grid in label_grid_map.get(label, []):
-                if grid != common_grid:
-                    feedback.append(f"📎 '{label}'은 흩어져 있어요. {common_region} 쪽으로 모아 정리해보세요.")
-    if "pen" in detected_labels and "pen holder" in detected_labels:
-        pen_grids = label_grid_map.get("pen", [])
-        holder_grids = label_grid_map.get("pen holder", [])
-        if pen_grids and holder_grids:
-            for g in pen_grids:
-                if all(g != hg for hg in holder_grids):
-                    feedback.append("✏️ 펜은 펜꽂이에 정리하면 더 깔끔하고 분실 걱정이 없어요.")
-                    break
-    elif "pen" in detected_labels and "pen holder" not in detected_labels:
-        feedback.append("✏️ 펜이 흩어져 있어요. 통이나 한곳에 정리해보세요.")
-    for label in ["drink", "food", "snack", "tissue"]:
-        if label in detected_labels and len(label_grid_map.get(label, [])) >= 2:
-            feedback.append(f"🧃 '{label}'이 많아요. 정리하거나 치워주세요.")
-    if "trash" in detected_labels:
-        feedback.append("🚮 쓰레기는 바로 버려주세요.")
-    if "bag" in detected_labels:
-        for grid in label_grid_map.get("bag", []):
-            if get_region(grid) != "left_side":
-                feedback.append("🎒 가방은 책상 위에 두지 말고 치워보세요.")
-    for label in ["cosmetic", "glasses"]:
-        if label in detected_labels:
-            for grid in label_grid_map.get(label, []):
-                if get_region(grid) not in ["left_side", "right_side"]:
-                    feedback.append(f"🧴 '{label}'은 구석(좌/우)에 두는 것이 더 깔끔해 보여요.")
-    if "calendar" in detected_labels:
-        cal_grids = label_grid_map.get("calendar", [])
-        cal_region = region_to_kr(get_region(cal_grids[0]))
-        for label in ["stopwatch", "watch", "earphone"]:
-            if label in detected_labels:
-                for g in label_grid_map.get(label, []):
-                    if get_region(g) != get_region(cal_grids[0]):
-                        feedback.append(f"🕒 '{label}'은 calendar가 있는 {cal_region} 쪽에 같이 두는 걸 추천해요.")
-    return list(dict.fromkeys(feedback))
+    # 셀 테두리 + 라벨
+    for r in range(rows):
+        for c in range(cols):
+            pt1 = (c * cell_w, desk_top + r * cell_h)
+            pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
+            cv2.rectangle(img, pt1, pt2, (0, 0, 0), 2)
+            label = f"[{r},{c}]"
+            cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
 
-# 피드백 요약 출력
-def summarize_feedback(custom_feedback, user_feedback, fb_group, score, breakdown, handed_str):
-    def print_unique(title, items):
-        if items:
-            print(f"\n{title}")
-            for item in items:
-                print(item)
-    print_unique("🧠 [사용자 배치 기준 피드백] 🧠", custom_feedback)
-    print(f"\n👉사용자 선택 : {handed_str}👈")
-    print_unique("🤚 [사용자 맞춤 피드백] 🤚", user_feedback)
-    print_unique("📦 [객체 분포 기반 피드백] 📦", fb_group)
-    print(f"\n📊 정돈 점수: {score}/100")
-    for k, v in breakdown.items():
-        if v != 0:
-            print(f"  - {k}: {v}")
-
-# 객체 탐지 결과 이미지 저장 경로
-def draw_boxes_and_save(img_path: str, objs: List[Tuple[int]], output_path: str):
-    """
-    객체 바운딩 박스만 그려서 output_path에 저장.
-    """
-    img = cv2.imread(img_path)
-    for (x1, y1, x2, y2, cls_id) in objs:
-        color = (0, 180, 255)
-        cv2.rectangle(img, (x1, y1), (x2, y2), color, 4)
-        cv2.putText(img, CLASS_NAMES[cls_id], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 6, cv2.LINE_AA)
-        cv2.putText(img, CLASS_NAMES[cls_id], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3, cv2.LINE_AA)
     cv2.imwrite(output_path, img)
-
-import os
-import uuid
-import random
-from typing import Dict, List
-
-# 더미 객체 리스트 생성
-def generate_dummy_boxes(num=5) -> List[tuple]:
-    return [(random.randint(100, 200), random.randint(100, 200), random.randint(201, 300), random.randint(201, 300), random.randint(0, 10)) for _ in range(num)]
-
-# YOLO 추론 없이 더미로 recommend_for_image 대체 함수
-def recommend_for_image_dummy(image_path: str, handedness: str, user_overrides: Dict) -> Dict:
-    print("⚠️ recommend_for_image_dummy() 호출됨 - 실제 YOLO 추론은 생략")
-
-    # 더미 정돈 점수
-    score = random.randint(60, 95)
-
-    # 더미 피드백
-    feedback = [
-        "✏️ 펜을 한 곳에 정리해보세요.",
-        "📚 책이 여러 위치에 분산되어 있습니다.",
-        "🧃 음료가 책상에 있습니다. 치우는 것을 추천합니다."
-    ]
-
-    # 더미 감점 항목
-    breakdown = {
-        "책 분산": -10,
-        "음료 존재": -5
-    }
-
-    # 더미 바운딩 박스
-    boxes = generate_dummy_boxes()
-
-    return {
-        "score": score,
-        "feedback": feedback,
-        "breakdown": breakdown,
-        "image_path": image_path
-    }
-
-
-
-
-
-USE_DUMMY_MODE = False
+    return output_path
 
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
-    if USE_DUMMY_MODE:
-        return recommend_for_image_dummy(
-            image_path=image_path,
-            handedness=handedness,
-            user_overrides=user_overrides
-        )
-
     try:
-        # 1. 모델 로딩
         MODEL_PATH = os.path.join(BASE_DIR, "models/weights/best.pt")
         print(f"📦 모델 경로 확인: {MODEL_PATH}")
         model = YOLO(MODEL_PATH)
         print("✅ 모델 로딩 완료")
 
-        # 2. 이미지 로딩
         print("🖼️ 이미지 로딩 시도")
         img = load_and_check_image(image_path)
         print("✅ 이미지 로딩 성공")
         h, w, _ = img.shape
         print(f"📐 이미지 크기: {w} x {h}")
 
-        # 3. YOLO 추론
         print("🔎 YOLO 추론 시작")
         objs, results = run_yolo_inference(model, image_path)
         print("✅ YOLO 추론 완료")
@@ -419,43 +370,33 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
         if not objs:
             print("⚠️ 객체 없음 → 분석 종료")
-            return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "boxes": []}
+            return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "image_path": image_path}
 
-        # 4. 그리드 분석
         print("🧭 그리드 분석 중...")
         grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
         print("✅ 그리드 분석 완료")
 
-        # 5. 라벨 집합 추출
         detected_labels = set(label for label, _, _ in object_info)
+        # 추천 배치 위치
+        # 사용자 설정값 적용
+        lifestyle = user_overrides.get("lifestyle", "")  # ex: "미니멀리스트"
+        usage = user_overrides.get("usage", "")  # "공부 / 취미,컴퓨터 / 게임" 같은 입력
+
+        recommendations = compute_recommendations(
+            list(detected_labels), WEIGHTS_DF, handedness, lifestyle, usage
+        )
         print(f"🏷️ 탐지된 라벨: {detected_labels}")
-
-        # 6. 사용자 가중치 통합
-        weights_map = get_user_weights(WEIGHTS_MAP, user_overrides)
-        print("⚖️ 사용자 가중치 반영 완료")
-
-        # 7. 피드백 생성
-        print("💡 피드백 생성 시작")
-        custom_feedback = feedback_custom_rules(label_grid_map, grid_objects, detected_labels)
-        user_feedback = csv_based_handed_feedback(label_grid_map, detected_labels, handedness, weights_map)
-        fb_group = feedback_by_group_and_grid(label_grid_map, grid_objects, detected_labels)
-        print("✅ 피드백 생성 완료")
-
-        # 8. 바운딩 박스 처리
-        boxes = results[0].boxes.xyxy.cpu().numpy().tolist()
-        print(f"📦 바운딩 박스 수: {len(boxes)}")
-
-        # 9. 정돈 점수 산정
-        print("📊 점수 계산 중...")
-        score, breakdown = compute_organization_score(label_grid_map, boxes, weights_map)
-        print(f"✅ 점수 산정 완료 → {score}")
-
-        result_img_name = os.path.basename(image_path)
-        result_img_path = os.path.join("static/images", result_img_name)
-
-        draw_boxes_and_save(image_path, objs, result_img_path)
         
-        # 10. 최종 결과 반환
+        # 정돈 점수 및 감점 breakdown
+        score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP)
+
+        # 피드백 (기본은 추천 메시지로 대체)
+        user_feedback = list(recommendations.values())
+        custom_feedback = []  # ← 이후 커스텀 룰 기반 피드백 함수 연결 예정이라면 여기에
+        fb_group = []         # ← 그룹 피드백 추후 확장
+
+        # 시각화
+        result_img_path = visualize_desk_grid(image_path=image_path, objs=objs)
         return {
             "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
@@ -465,8 +406,9 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
     except Exception as e:
         print("❌ [recommend_for_image] 오류 발생:", str(e))
-        return recommend_for_image_dummy(
-            image_path=image_path,
-            handedness=handedness,
-            user_overrides=user_overrides
-        )
+        return {
+            "score": 0,
+            "feedback": [],
+            "breakdown": "error",
+            "image_path": ""
+        }
