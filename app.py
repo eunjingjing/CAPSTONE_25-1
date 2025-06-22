@@ -13,8 +13,8 @@ import datetime
 from werkzeug.utils import secure_filename
 from recommend import recommend_for_image
 
-# Flask 앱 생성
-app = Flask(__name__)
+# Flask 앱 생성 및 정적파일 제어
+app = Flask(__name__, static_folder="static")
 
 # .env 불러오기
 load_dotenv()
