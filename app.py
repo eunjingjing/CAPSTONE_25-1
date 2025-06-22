@@ -220,7 +220,8 @@ def recommend():
     image = request.files['image']  # ✅ 파일은 request.files에서 받아야 함
     hand = request.form.get('hand')
     lifestyle = request.form.get('lifestyle')
-    purpose = request.form.get('purpose')
+    purpose_raw = request.form.get('purpose')  # "공부 / 취미,컴퓨터 / 게임"
+    purpose_list = [p.strip() for p in purpose_raw.split(',') if p.strip()]
 
     # 이미지 받기 (폼에서 name="image"인 input에서)
     image = request.files['image']
@@ -241,7 +242,7 @@ def recommend():
         handedness=hand,
         user_overrides={
             "라이프스타일": lifestyle,
-            "사용목적": purpose
+            "사용목적": purpose_list
         }
     )
     print("✅ YOLO 처리 완료")
