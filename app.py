@@ -45,10 +45,11 @@ csrf = CSRFProtect(app)
 app.permanent_session_lifetime = timedelta(minutes=30)
 
 # 쿠키 보안 설정
+# HTTPS 환경에서만 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# HTTPS 환경에서만 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
-# app.config['SESSION_COOKIE_SECURE'] = True
+
 
 # DB 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@15.164.4.130:3306/desk'
