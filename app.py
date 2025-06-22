@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import os
 import uuid
 import datetime
+import requests
 from werkzeug.utils import secure_filename
 from recommend import recommend_for_image
 
@@ -58,6 +59,28 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # DB 초기화
 db = SQLAlchemy(app)
 
+# RunPod에 이미지 전송 함수
+def send_to_runpod(image_path, handedness, lifestyle, purpose):
+    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict" # 보안 필요(.env에서 가져오기)
+    with open(image_path, 'rb') as f:
+        files = {'file': f}
+        data = {
+            "handedness": handedness,
+            "lifestyle": lifestyle,
+            "purpose": purpose
+        }
+        try:
+            response = requests.post(runpod_url, files=files, data=data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print("❌ RunPod 요청 실패:", str(e))
+            return {
+                "score": 0,
+                "feedback": ["RunPod 요청 실패: " + str(e)],
+                "breakdown": "error",
+                "image_path": ""
+            }
 
 # DB 연결 확인 라우트
 @app.route('/testdb')
@@ -212,40 +235,32 @@ def reset_password(token):
 
     return render_template('reset_password.html', token=token)
 
-#배치 추천
+#배치 추천(RunPod 호출)
 @app.route('/recommend', methods=['POST'])
 def recommend():
     print("🔥 recommend() 호출됨")
     user_id = session.get('user_id', None)
-    image = request.files['image']  # ✅ 파일은 request.files에서 받아야 함
+    image = request.files['image']
     hand = request.form.get('hand')
     lifestyle = request.form.get('lifestyle')
-    purpose_raw = request.form.get('purpose')  # "공부 / 취미,컴퓨터 / 게임"
+    purpose_raw = request.form.get('purpose')
     purpose_list = [p.strip() for p in purpose_raw.split(',') if p.strip()]
 
-    # 이미지 받기 (폼에서 name="image"인 input에서)
-    image = request.files['image']
     if not image:
         return "이미지가 업로드되지 않았습니다.", 400
 
-    # 고유 파일 이름 생성
     filename = uuid.uuid4().hex + os.path.splitext(image.filename)[-1]
     upload_path = os.path.join('static/uploads', filename)
-
-    # 이미지 저장
     image.save(upload_path)
 
-    print("✅ YOLO 분석 실행")
-    # YOLO 분석 실행
-    result = recommend_for_image(
+    print("📡 RunPod에 분석 요청 전송 중...")
+    result = send_to_runpod(
         image_path=upload_path,
         handedness=hand,
-        user_overrides={
-            "라이프스타일": lifestyle,
-            "사용목적": purpose_list
-        }
+        lifestyle=lifestyle,
+        purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
     )
-    print("✅ YOLO 처리 완료")
+    print("✅ RunPod 응답 수신 완료")
 
     new_image = Image(
         이미지ID=uuid.uuid4().hex,
@@ -257,7 +272,6 @@ def recommend():
     db.session.commit()
     image_id = new_image.이미지ID
 
-    # DB 저장
     new_rec = Recommendation(
         추천ID=uuid.uuid4().hex,
         사용자ID=user_id,
