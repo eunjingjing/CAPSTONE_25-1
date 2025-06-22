@@ -306,6 +306,6 @@ def my_page():
 
     return render_template('my_page.html', records=record_list)
 
-# run
+# RunPod 외부 접근 허용
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)
