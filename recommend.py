@@ -79,15 +79,19 @@ def get_desk_top_dynamic(
 # === 책상 그리드(3X4) 정의 및 한글 변환 ===
 def create_grid_map(rows:int=3, cols:int=4) -> Tuple[Dict[str, List[Tuple[int,int]]], Dict[str, str]]:
     region_map = {
-        "left_side": [(r,0) for r in range(rows)],
-        "right_side": [(r,cols-1) for r in range(rows)],
-        "top": [(0,c) for c in range(1,cols-1)],
-        "center": [(r,c) for r in range(1,rows) for c in range(1,cols-1)]
+        "left_top": [(0,0)],
+        "top": [(0,1), (0,2)],
+        "right_top": [(0,3)],
+        "left": [(1,0), (2,0)],
+        "right": [(1,3), (2,3)],
+        "center": [(1,1), (1,2), (2,1), (2,2)],
     }
     region_kr = {
-        "left_side": "왼쪽",
-        "right_side": "오른쪽",
+        "left_top": "좌측 상단",
         "top": "상단",
+        "right_top": "우측 상단",
+        "left": "왼쪽",
+        "right": "오른쪽",
         "center": "중앙"
     }
     return region_map, region_kr
@@ -155,27 +159,20 @@ def compute_recommendations(
     detected_labels: List[str],
     weights_df: pd.DataFrame,
     handedness: str,
-    lifestyle: str,
     usage: List[str],
+    label_grid_map: Dict[str, List[Tuple[int, int]]],
     rows: int = 3,
     cols: int = 4
 ) -> Dict[str, str]:
     weights_df = weights_df.set_index("class")
     region_objects = {region_key: [] for region_key in REGION_MAP.keys()}
-    base_position_weight = np.zeros((rows, cols))
-
-    for y in range(rows):
-        for x in range(cols):
-            x_score = -abs(x - 1.5) + 1.5
-            y_score = y
-            base_position_weight[y, x] = x_score + y_score
 
     recommendations = {}
 
     for label in detected_labels:
         row = weights_df.loc[label]
         if row["base_importance"] == 0:
-            recommendations[label] = f"'{label}'은(는) 책상 위에 올려둘 필요가 없어요. 치워주세요!"
+            recommendations[label] = f"'{label}'은(는) 책상 위에서 치워주세요."
             continue
 
         # 손잡이 반영: 우측 선호 또는 좌측 선호에 따라 열 가중치 차등
@@ -186,35 +183,50 @@ def compute_recommendations(
             elif handedness == "오른손잡이":
                 hand_bias = [1.0, 0.5, 0.2, 0]
 
-        # 사용 용도 반영
-        usage_bonus = 0
-        if "공부 / 취미" in usage and row["base_importance"] <= 2:
-            usage_bonus = 0.5
-        elif "컴퓨터 / 게임" in usage and row["base_importance"] >= 3:
-            usage_bonus = 1.0
-
         # 위치별 점수 계산
-        position_matrix = np.copy(base_position_weight)
+        # position_matrix = np.copy(base_position_weight)
+        position_matrix = np.zeros((rows, cols))
         for y in range(rows):
-            for x in range(cols):
-                region_key = get_region_key_from_grid((y, x))
-                score = position_matrix[y, x]
-                score *= (1 + 0.3 * row["x_weight"] + 0.3 * row["y_weight"])  # 위치 선호 반영
-                score += hand_bias[x] + usage_bonus + row["base_importance"]
-                clutter_penalty = len(region_objects[region_key]) * (2.0 if lifestyle == "미니멀리스트" else 0.8)
-                score -= clutter_penalty
-                position_matrix[y, x] = score
+                for x in range(cols):
+                    # 위치 기반 유사도 계산
+                    x_center_similarity = 1 - abs(x - 1.5) / 1.5   # 중심(1,2)일수록 1
+                    y_lower_similarity = y / 2.0                   # 하단(2)일수록 1
+                    weight_score = x_center_similarity * row["x_weight"] + y_lower_similarity * row["y_weight"]
+
+                    # 목적에 따른 위치 보너스
+                    usage_bonus = 0
+                    if "공부 / 취미" in usage and label in STUDY_OBJECTS and y in [1, 2]:
+                        usage_bonus += 0.4  # 더 가깝게 배치
+                    if "컴퓨터 / 게임" in usage and label in COMPUTER_OBJECTS and y in [1, 2]:
+                        usage_bonus += 0.4  # 더 가깝게 배치
+
+                    # 종합 점수 계산
+                    score = weight_score    # 일반화 된 가중치
+                    score += usage_bonus    # 사용 목적에 따른 가중치
+                    score += hand_bias[x]   # 손잡이 가중치
+
+                    # 주요 객체는 중심 가중치 부여
+                    center_similarity = 1 - (abs(x - 1.5) / 1.5 + abs(y - 1.5) / 1.5) / 2
+                    base_importance_bonus = center_similarity * row["base_importance"]
+                    score += base_importance_bonus
+
+                    position_matrix[y, x] = score
 
         best_y, best_x = np.unravel_index(np.argmax(position_matrix), position_matrix.shape)
         best_region_key = get_region_key_from_grid((best_y, best_x))
         best_region_kr = REGION_KR[best_region_key]
         region_objects[best_region_key].append(label)
 
-        recommendations[label] = f"'{label}'은(는) 책상 {best_region_kr}에 두는 게 좋아 보여요!"
+        # 실제 위치와 비교 후 피드백 제공
+        actual_grids = label_grid_map.get(label, [])
+        actual_regions = {get_region_key_from_grid(grid) for grid in actual_grids}
+        name_kr = row["korean_name"]
+        if best_region_key not in actual_regions:
+            recommendations[label] = f"'{name_kr}'은(는) 책상 {best_region_kr}에 두는 게 좋아 보여요!"
 
     return recommendations
 
-# 고도화된 정돈 점수 산정 함수: 그룹별 균형, 책 분산, 중요도 우선 배치, 중심 혼잡도, 겹침 등 반영
+# 겹침 정도 계산
 def compute_overlap_penalty(boxes: List[List[float]], threshold: float = 0.6) -> int:
     heavy_overlap = 0
     for i in range(len(boxes)):
@@ -230,6 +242,7 @@ def compute_overlap_penalty(boxes: List[List[float]], threshold: float = 0.6) ->
                 heavy_overlap += 1
     return min(heavy_overlap * 2, 20)
 
+# 점수 산정 함수
 def compute_organization_score(
     label_grid_map: Dict[str, List[Tuple[int, int]]],
     boxes: List[List[float]],
@@ -256,27 +269,6 @@ def compute_organization_score(
     if "books" in label_grid_map and len(set(label_grid_map["books"])) >= 3:
         score -= 20
         breakdown["책 분산"] = -20
-
-    # 3. 중심 혼잡도 패널티
-    center_cells = [(1,1), (1,2), (2,1), (2,2)]
-    center_count = sum([
-        len(label_grid_map.get(label, []))
-        for label in label_grid_map
-        for grid in label_grid_map[label]
-        if grid in center_cells
-    ])
-    if center_count >= 6:
-        score -= 10
-        breakdown["중심 혼잡"] = -10
-
-    # 4. 중요도 높은 객체가 외곽에 있을 경우 감점
-    for label, grids in label_grid_map.items():
-        if label in weights_map and weights_map[label].get("base_importance", 0) >= 4:
-            for grid in grids:
-                if grid in [(0,0), (0,3), (2,0), (2,3)]:
-                    score -= 5
-                    breakdown[f"{label} 위치 부적절"] = -5
-                    break
 
     # 5. 그룹 균형 점검 (stationery)
     stationery_labels = [
@@ -352,7 +344,7 @@ def visualize_desk_grid(
 
 import traceback  # 꼭 필요
 
-def recommend_for_image(image_path: str, handedness: str, user_overrides: dict, model=None):
+def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     try:
         MODEL_PATH = os.path.join(BASE_DIR, "model", "best.pt")
         print(f"📦 모델 경로 확인: {MODEL_PATH}")
@@ -393,12 +385,12 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict, 
 
         # 추천 위치
         recommendations = compute_recommendations(
-            list(detected_labels), WEIGHTS_DF, handedness, lifestyle, usage
+            list(detected_labels), WEIGHTS_DF, handedness, usage, label_grid_map
         )
         print(f"🏷️ 탐지된 라벨: {detected_labels}")
 
         # 정돈 점수 및 감점 breakdown
-        score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP)
+        score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP, lifestyle)
 
         # 피드백 구성
         user_feedback = list(recommendations.values())
@@ -413,8 +405,8 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict, 
             user_feedback = ["분석 결과에 따른 피드백이 부족합니다. 입력 설정을 확인해주세요."]
         print("📝 최종 피드백 목록:", user_feedback)
         return {
-        "score": score,
-            "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
+            "score": score,
+            "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),    # 현재 user feedback만 사용 중 
             "breakdown": breakdown,
             "image_path": result_img_path
         }
