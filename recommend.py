@@ -354,7 +354,7 @@ import traceback  # 꼭 필요
 
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     try:
-        MODEL_PATH = os.path.join(BASE_DIR, "models/weights/best.pt")
+        MODEL_PATH = os.path.join(BASE_DIR, "model", "best.pt")
         print(f"📦 모델 경로 확인: {MODEL_PATH}")
         model = YOLO(MODEL_PATH)
         print("✅ 모델 로딩 완료")
@@ -385,7 +385,7 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
         detected_labels = set(label for label, _, _ in object_info)
 
-        # ✅ [중요] key 명 확인: app.py에서 "라이프스타일", "사용목적"으로 들어옴
+        # [중요] key 명 확인: app.py에서 "라이프스타일", "사용목적"으로 들어옴
         lifestyle = user_overrides.get("라이프스타일", "")
         usage = user_overrides.get("사용목적", [])
 
@@ -396,17 +396,18 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
             list(detected_labels), WEIGHTS_DF, handedness, lifestyle, usage
         )
         print(f"🏷️ 탐지된 라벨: {detected_labels}")
-        
+
         # 정돈 점수 및 감점 breakdown
         score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP)
 
-        # 피드백
+        # 피드백 구성
         user_feedback = list(recommendations.values())
         custom_feedback = []
         fb_group = []
 
-        # 시각화
-        result_img_path = visualize_desk_grid(image_path=image_path, objs=objs)
+        # 시각화(이미지 경로 반환 (EC2가 정적 URL로 렌더링 가능하게))
+        filename = os.path.basename(image_path)
+        result_img_path = f"/static/images/{filename}"
 
         return {
             "score": score,
