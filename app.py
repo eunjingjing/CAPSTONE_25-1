@@ -262,10 +262,10 @@ def recommend():
         purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
     )
     
-    print("📦 EC2 수신된 RunPod 결과:")
-    print("📌 점수:", result.get("score"))
-    print("📌 피드백:", result.get("feedback"))
-    print("📌 이미지 경로:", result.get("image_path"))
+    print("📦 EC2 수신된 RunPod 결과:", flush=True)
+    print("📌 점수:", result.get("score"), flush=True)
+    print("📌 피드백:", result.get("feedback"), flush=True)
+    print("📌 이미지 경로:", result.get("image_path"), flush=True)
 
     # RunPod 응답 유효성 확인
     if "score" not in result or "feedback" not in result:
