@@ -60,9 +60,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # DB 초기화
 db = SQLAlchemy(app)
 
-# CSRF 보호 초기화
-csrf = CSRFProtect(app)
-
 # RunPod에 이미지 전송 함수
 def send_to_runpod(image_path, handedness, lifestyle, purpose):
     runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict" # 보안 필요(.env에서 가져오기)
