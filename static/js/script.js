@@ -125,8 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fileInput.addEventListener('change', checkReady);
 
-    document.getElementById("recommendBtn").addEventListener("click", (e) => {
-        e.preventDefault();
+    document.getElementById("recommendBtn").addEventListener("click", () => {
+        // e.preventDefault();
         const hand = document.querySelector(".hand-group .btn-group .active")?.textContent.trim() || "";
         const lifestyle = document.querySelector(".lifestyle-group .btn-group .active")?.textContent.trim() || "";
         const purposeElems = document.querySelectorAll(".purpose-group .btn-group .active");
