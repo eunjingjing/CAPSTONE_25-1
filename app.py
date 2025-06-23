@@ -72,8 +72,35 @@ def send_to_runpod(image_path, handedness, lifestyle, purpose):
         }
         try:
             response = requests.post(runpod_url, files=files, data=data)
-            response.raise_for_status()
-            return response.json()
+            print("📬 RunPod 응답 코드:", response.status_code)
+            print("📄 RunPod 응답 원문:\n", response.text)
+
+            response.raise_for_status()  # 예외 발생 시 아래 코드로 안 넘어감
+
+            try:
+                result = response.json()
+                print("✅ RunPod JSON 파싱 결과:", result)
+            except Exception as json_err:
+                print("❌ JSON 파싱 실패:", str(json_err))
+                return {
+                    "score": 0,
+                    "feedback": ["RunPod 응답은 받았지만 JSON 파싱에 실패했습니다."],
+                    "breakdown": "error",
+                    "image_path": ""
+                }
+
+            # 필수 필드 확인
+            if "score" not in result or "feedback" not in result:
+                print("⚠️ RunPod 응답에 필수 필드 누락됨")
+                return {
+                    "score": 0,
+                    "feedback": ["RunPod 응답에 필수 필드가 누락되었습니다."],
+                    "breakdown": "error",
+                    "image_path": ""
+                }
+
+            return result
+
         except Exception as e:
             print("❌ RunPod 요청 실패:", str(e))
             return {
