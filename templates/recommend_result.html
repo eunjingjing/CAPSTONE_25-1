@@ -38,7 +38,7 @@
     {% if result %}
     <div class="result-section">
       <p><strong>정돈 점수:</strong> {{ result.score }}/100</p>
-      
+
       {% if result.breakdown and result.breakdown != "error" %}
       <div class="breakdown">
         <h4>🔻 감점 항목</h4>
@@ -50,7 +50,7 @@
       </div>
       {% endif %}
 
-      {% if result.feedback %}
+      {% if result.feedback is defined and result.feedback | length > 0 %}
       <div class="feedback">
         <h4>💡 피드백</h4>
         <ul>
@@ -58,6 +58,11 @@
             <li>{{ fb }}</li>
           {% endfor %}
         </ul>
+      </div>
+      {% else %}
+      <div class="feedback">
+        <h4>💡 피드백</h4>
+        <p>피드백이 존재하지 않습니다.</p>
       </div>
       {% endif %}
     </div>
