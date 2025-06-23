@@ -411,8 +411,9 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
         if not user_feedback:
             user_feedback = ["분석 결과에 따른 피드백이 부족합니다. 입력 설정을 확인해주세요."]
+        print("📝 최종 피드백 목록:", user_feedback)
         return {
-            "score": score,
+        "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
             "breakdown": breakdown,
             "image_path": result_img_path
