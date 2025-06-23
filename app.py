@@ -263,8 +263,8 @@ def recommend():
     )
     
     # RunPod 응답 유효성 확인
-    if not result.get("image_path") and not result.get("image_base64"):
-        print("❌ RunPod 응답에 이미지 경로 또는 base64 인코딩 데이터가 없습니다.")
+    if "score" not in result or "feedback" not in result:
+        print("❌ RunPod 응답에 필수 필드가 없습니다.")
         return "이미지 분석 결과가 유효하지 않습니다.", 500
 
     # RunPod 응답 수신 후 → 이미지 저장
