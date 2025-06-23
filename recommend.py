@@ -1,4 +1,5 @@
 import os
+import uuid
 import cv2
 import time
 import numpy as np
@@ -302,9 +303,10 @@ def visualize_desk_grid(
     h, w, _ = img.shape
     desk_top = get_desk_top_dynamic(objs, exclude_classes=EXCLUDE_CLASSES_BACKGROUND, class_names=CLASS_NAMES, img_h=h)
     
-    # 저장 경로를 자동 생성
-    filename = os.path.basename(image_path)
-    output_path = os.path.join("/home/ec2-user/my-project/static/images", filename)
+    # 🔁 FastAPI에서 이미지 저장하는 것과 동일한 방식으로 UUID 이름으로 저장
+    image_id = str(uuid.uuid4())
+    filename = f"{image_id}.jpg"
+    output_path = os.path.join(os.getcwd(), filename)  # 현재 작업 경로 (보통 /workspace)
     
     desk_bottom = h
     cell_w = w // cols
@@ -397,9 +399,15 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         custom_feedback = []
         fb_group = []
 
-        # 시각화(이미지 경로 반환 (EC2가 정적 URL로 렌더링 가능하게))
-        filename = os.path.basename(image_path)
-        result_img_path = f"/static/images/{filename}"
+        # 시각화 이미지 그리드 적용 및 저장
+        print("🎨 시각화 이미지 생성 중...")
+        grid_img_abspath = visualize_desk_grid(image_path, objs)
+        result_img_path = os.path.basename(grid_img_abspath)
+        print("✅ 시각화 이미지 저장 완료:", grid_img_abspath)
+
+        # # 시각화(이미지 경로 반환 (EC2가 정적 URL로 렌더링 가능하게))
+        # filename = os.path.basename(image_path)
+        # result_img_path = f"/static/images/{filename}"
 
         if not user_feedback:
             user_feedback = ["분석 결과에 따른 피드백이 부족합니다. 입력 설정을 확인해주세요."]
