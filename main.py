@@ -38,7 +38,7 @@ async def predict(
     result = recommend_for_image(
         file_path,
         handedness=handedness,
-        user_overrides=user_overrides
+        user_overrides=user_overrides,
         model=model
     )
 
