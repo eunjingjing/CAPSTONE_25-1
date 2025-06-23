@@ -23,6 +23,8 @@ load_dotenv()
 
 # Flask 보안 키 설정 (.env에서 가져옴)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+if not app.config['SECRET_KEY']:
+    print("❗ 환경변수 SECRET_KEY가 설정되지 않았습니다.")
 
 # Flask-Mail 설정
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -62,53 +64,24 @@ db = SQLAlchemy(app)
 
 # RunPod에 이미지 전송 함수
 def send_to_runpod(image_path, handedness, lifestyle, purpose):
-    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict" # 보안 필요(.env에서 가져오기)
+    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict"
     with open(image_path, 'rb') as f:
         files = {'file': f}
-        data = {
-            "handedness": handedness,
-            "lifestyle": lifestyle,
-            "purpose": purpose
-        }
+        data = {"handedness": handedness, "lifestyle": lifestyle, "purpose": purpose}
         try:
-            response = requests.post(runpod_url, files=files, data=data)
+            response = requests.post(runpod_url, files=files, data=data, timeout=120)
             print("📬 RunPod 응답 코드:", response.status_code)
-            print("📄 RunPod 응답 원문:\n", response.text)
-
-            response.raise_for_status()  # 예외 발생 시 아래 코드로 안 넘어감
-
-            try:
-                result = response.json()
-                print("✅ RunPod JSON 파싱 결과:", result)
-            except Exception as json_err:
-                print("❌ JSON 파싱 실패:", str(json_err))
-                return {
-                    "score": 0,
-                    "feedback": ["RunPod 응답은 받았지만 JSON 파싱에 실패했습니다."],
-                    "breakdown": "error",
-                    "image_path": ""
-                }
-
-            # 필수 필드 확인
+            print("📄 RunPod 응답 원문:", response.text)
+            response.raise_for_status()
+            result = response.json()
             if "score" not in result or "feedback" not in result:
                 print("⚠️ RunPod 응답에 필수 필드 누락됨")
-                return {
-                    "score": 0,
-                    "feedback": ["RunPod 응답에 필수 필드가 누락되었습니다."],
-                    "breakdown": "error",
-                    "image_path": ""
-                }
-
+                return {"score": 0, "feedback": ["RunPod 응답에 필수 필드가 누락되었습니다."], "breakdown": "error", "image_path": ""}
             return result
-
         except Exception as e:
             print("❌ RunPod 요청 실패:", str(e))
-            return {
-                "score": 0,
-                "feedback": ["RunPod 요청 실패: " + str(e)],
-                "breakdown": "error",
-                "image_path": ""
-            }
+            return {"score": 0, "feedback": ["RunPod 요청 실패: " + str(e)], "breakdown": "error", "image_path": ""}
+
 
 # DB 연결 확인 라우트
 @app.route('/testdb')
@@ -280,6 +253,7 @@ def recommend():
 
     filename = uuid.uuid4().hex + os.path.splitext(image.filename)[-1]
     upload_path = os.path.join('static/uploads', filename)
+    os.makedirs('static/uploads', exist_ok=True)
     image.save(upload_path)
 
     print("📡 RunPod에 분석 요청 전송 중...")
