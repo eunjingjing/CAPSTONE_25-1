@@ -11,8 +11,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=NanumGothic&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
-
-  <!-- 스타일 -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -37,10 +35,11 @@
   <div class="result-container">
     <h2>📊 정리 분석 결과</h2>
 
+    {% if result %}
     <div class="result-section">
       <p><strong>정돈 점수:</strong> {{ result.score }}/100</p>
       
-      {% if result.breakdown %}
+      {% if result.breakdown and result.breakdown != "error" %}
       <div class="breakdown">
         <h4>🔻 감점 항목</h4>
         <ul>
@@ -65,8 +64,17 @@
 
     <div class="image-preview">
       <h4>📷 업로드 이미지</h4>
-      <img src="{{ url_for('static', filename=image_path.split('static/')[-1]) }}" alt="분석 이미지" style="max-width: 100%; border: 1px solid #ccc; border-radius: 8px;" />
+      {% if result.image_path %}
+        {% set image_file = result.image_path.split('static/')[-1] %}
+        <img src="{{ url_for('static', filename=image_file) }}" alt="분석 이미지"
+             style="max-width: 100%; border: 1px solid #ccc; border-radius: 8px;" />
+      {% else %}
+        <p>이미지를 표시할 수 없습니다.</p>
+      {% endif %}
     </div>
+    {% else %}
+      <p>분석 결과를 불러올 수 없습니다.</p>
+    {% endif %}
 
     <div style="margin-top: 30px;">
       <a href="{{ url_for('index') }}" class="button">← 돌아가기</a>
