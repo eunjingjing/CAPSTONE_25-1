@@ -350,6 +350,8 @@ def visualize_desk_grid(
     cv2.imwrite(output_path, img)
     return output_path
 
+import traceback  # 꼭 필요
+
 def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
     try:
         MODEL_PATH = os.path.join(BASE_DIR, "models/weights/best.pt")
@@ -370,18 +372,26 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
 
         if not objs:
             print("⚠️ 객체 없음 → 분석 종료")
-            return {"score": 0, "feedback": ["객체가 탐지되지 않았습니다."], "image_path": image_path}
+            return {
+                "score": 0,
+                "feedback": ["객체가 탐지되지 않았습니다."],
+                "image_path": image_path,
+                "breakdown": {}
+            }
 
         print("🧭 그리드 분석 중...")
         grid_objects, label_grid_map, object_info = analyze_objects_by_grid(objs, h, w)
         print("✅ 그리드 분석 완료")
 
         detected_labels = set(label for label, _, _ in object_info)
-        # 추천 배치 위치
-        # 사용자 설정값 적용
-        lifestyle = user_overrides.get("lifestyle", "")  # ex: "미니멀리스트"
-        usage = user_overrides.get("usage", "")  # "공부 / 취미,컴퓨터 / 게임" 같은 입력
 
+        # ✅ [중요] key 명 확인: app.py에서 "라이프스타일", "사용목적"으로 들어옴
+        lifestyle = user_overrides.get("라이프스타일", "")
+        usage = user_overrides.get("사용목적", [])
+
+        print(f"👤 사용자 설정 → 라이프스타일: {lifestyle}, 사용목적: {usage}")
+
+        # 추천 위치
         recommendations = compute_recommendations(
             list(detected_labels), WEIGHTS_DF, handedness, lifestyle, usage
         )
@@ -390,13 +400,14 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         # 정돈 점수 및 감점 breakdown
         score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP)
 
-        # 피드백 (기본은 추천 메시지로 대체)
+        # 피드백
         user_feedback = list(recommendations.values())
-        custom_feedback = []  # ← 이후 커스텀 룰 기반 피드백 함수 연결 예정이라면 여기에
-        fb_group = []         # ← 그룹 피드백 추후 확장
+        custom_feedback = []
+        fb_group = []
 
         # 시각화
         result_img_path = visualize_desk_grid(image_path=image_path, objs=objs)
+
         return {
             "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
@@ -405,10 +416,11 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         }
 
     except Exception as e:
-        print("❌ [recommend_for_image] 오류 발생:", str(e))
+        print("❌ [recommend_for_image] 예외 발생:", str(e))
+        traceback.print_exc()
         return {
             "score": 0,
-            "feedback": [],
+            "feedback": ["분석 중 예외 발생: " + str(e)],
             "breakdown": "error",
             "image_path": ""
         }
