@@ -61,8 +61,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # RunPod에 이미지 전송 함수
+
+
 def send_to_runpod(image_path, handedness, lifestyle, purpose):
-    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict" # 보안 필요(.env에서 가져오기)
+    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict"  # 보안 필요(.env에서 가져오기)
     with open(image_path, 'rb') as f:
         files = {'file': f}
         data = {
@@ -74,11 +76,11 @@ def send_to_runpod(image_path, handedness, lifestyle, purpose):
             response = requests.post(runpod_url, files=files, data=data)
             response.raise_for_status()
             result = response.json()
-
-            # 최소 필드만 검사
             required_keys = ["score", "feedback"]
             if not all(k in result for k in required_keys):
                 raise ValueError("RunPod 응답에 필수 필드가 누락되었습니다.")
+            if not result.get("image_path") and not result.get("image_base64"):
+                raise ValueError("RunPod 응답에 이미지 정보가 없습니다.")
             return result
         except Exception as e:
             print("❌ RunPod 요청 실패:", str(e))
@@ -88,6 +90,8 @@ def send_to_runpod(image_path, handedness, lifestyle, purpose):
                 "breakdown": "error",
                 "image_path": ""
             }
+
+
 
 # DB 연결 확인 라우트
 @app.route('/testdb')
