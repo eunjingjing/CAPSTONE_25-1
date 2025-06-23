@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', () => {
     const uploadBox = document.querySelector('.upload-box');
     const fileInput = document.getElementById('imgUpload');
@@ -114,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const purposeSelectedCount = [...purposeButtons].filter(b => b.classList.contains('active')).length;
 
         let valid = false;
-
         if (autoSelected) {
             valid = hasImage && handSelected;
         } else {
@@ -127,10 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fileInput.addEventListener('change', checkReady);
 
-    // 최종 form 제출
     document.getElementById("recommendBtn").addEventListener("click", (e) => {
-        e.preventDefault(); // 기본 submit 막고 수동 처리
-
+        e.preventDefault();
         const hand = document.querySelector(".hand-group .btn-group .active")?.textContent.trim() || "";
         const lifestyle = document.querySelector(".lifestyle-group .btn-group .active")?.textContent.trim() || "";
         const purposeElems = document.querySelectorAll(".purpose-group .btn-group .active");
@@ -140,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("lifestyleInput").value = lifestyle;
         document.getElementById("purposeInput").value = purposes;
 
+        console.log("✅ recommendForm submit 직전");
         document.getElementById("recommendForm").submit();
     });
 });
