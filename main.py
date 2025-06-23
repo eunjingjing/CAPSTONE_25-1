@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse
 from ultralytics import YOLO
 from recommend import recommend_for_image
@@ -11,11 +11,17 @@ model = YOLO(MODEL_PATH)
 
 @app.post("/predict")
 async def predict(
+    request: Request,
     file: UploadFile = File(...),
     handedness: str = Form(...),
     lifestyle: str = Form(...),
     purpose: str = Form(...)
 ):
+    print("[FastAPI] 수신된 입력값:")
+    print("  handedness:", handedness)
+    print("  lifestyle:", lifestyle)
+    print("  purpose:", purpose)
+
     # 1. 이미지 저장
     image_id = str(uuid.uuid4())
     file_path = f"{image_id}.jpg"
@@ -23,16 +29,20 @@ async def predict(
         shutil.copyfileobj(file.file, buffer)
 
     # 2. 분석 수행
+    user_overrides = {
+        "라이프스타일": lifestyle.strip(),
+        "사용목적": [p.strip() for p in purpose.split(",") if p.strip()]
+    }
+    print("  user_overrides:", user_overrides)
+
     result = recommend_for_image(
         file_path,
         handedness=handedness,
-        user_overrides={
-            "라이프스타일": lifestyle,
-            "사용목적": purpose.split(',') if purpose else []
-        }
+        user_overrides=user_overrides
     )
-    feedback = result["feedback"]
-    score = result["score"]
+
+    feedback = result.get("feedback", ["피드백 없음"])
+    score = result.get("score", 0)
     breakdown = result.get("breakdown", {})
     result_img_path = result.get("image_path", "")
 
