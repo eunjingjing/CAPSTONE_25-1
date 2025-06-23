@@ -409,6 +409,8 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         filename = os.path.basename(image_path)
         result_img_path = f"/static/images/{filename}"
 
+        if not user_feedback:
+            user_feedback = ["분석 결과에 따른 피드백이 부족합니다. 입력 설정을 확인해주세요."]
         return {
             "score": score,
             "feedback": list(dict.fromkeys(custom_feedback + user_feedback + fb_group)),
