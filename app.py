@@ -74,7 +74,9 @@ def send_to_runpod(image_path, handedness, lifestyle, purpose):
             response = requests.post(runpod_url, files=files, data=data)
             response.raise_for_status()
             result = response.json()
-            required_keys = ["score", "feedback", "image_base64"]
+
+            # 최소 필드만 검사
+            required_keys = ["score", "feedback"]
             if not all(k in result for k in required_keys):
                 raise ValueError("RunPod 응답에 필수 필드가 누락되었습니다.")
             return result
