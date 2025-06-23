@@ -352,7 +352,7 @@ def visualize_desk_grid(
 
 import traceback  # 꼭 필요
 
-def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
+def recommend_for_image(image_path: str, handedness: str, user_overrides: dict, model=None):
     try:
         MODEL_PATH = os.path.join(BASE_DIR, "model", "best.pt")
         print(f"📦 모델 경로 확인: {MODEL_PATH}")

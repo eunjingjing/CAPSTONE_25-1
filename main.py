@@ -39,6 +39,7 @@ async def predict(
         file_path,
         handedness=handedness,
         user_overrides=user_overrides
+        model=model
     )
 
     feedback = result.get("feedback", ["피드백 없음"])
