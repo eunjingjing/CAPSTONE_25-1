@@ -260,6 +260,19 @@ def recommend():
         lifestyle=lifestyle,
         purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
     )
+    
+    # RunPod 응답 수신 후 → 이미지 저장
+    image_filename = result.get("image_filename", uuid.uuid4().hex + ".jpg")
+    image_base64 = result.get("image_base64", "")
+
+    if image_base64:
+        decoded_image = base64.b64decode(image_base64)
+        ec2_image_path = os.path.join("static/uploads", image_filename)
+        with open(ec2_image_path, "wb") as f:
+            f.write(decoded_image)
+        result["image_path"] = ec2_image_path  # HTML에서 사용할 경로로 업데이트
+
+
     print("✅ RunPod 응답 수신 완료")
 
     new_image = Image(
