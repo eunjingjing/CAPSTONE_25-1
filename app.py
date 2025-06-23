@@ -11,6 +11,7 @@ import os
 import uuid
 import datetime
 import requests
+import base64
 from werkzeug.utils import secure_filename
 from recommend import recommend_for_image
 
@@ -261,6 +262,11 @@ def recommend():
         purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
     )
     
+    # RunPod 응답 유효성 확인
+    if not result.get("image_path") and not result.get("image_base64"):
+        print("❌ RunPod 응답에 이미지 경로 또는 base64 인코딩 데이터가 없습니다.")
+        return "이미지 분석 결과가 유효하지 않습니다.", 500
+
     # RunPod 응답 수신 후 → 이미지 저장
     image_filename = result.get("image_filename", uuid.uuid4().hex + ".jpg")
     image_base64 = result.get("image_base64", "")
@@ -297,9 +303,14 @@ def recommend():
     db.session.commit()
 
     print("✅ DB 저장 완료")
+
+    # image_path 상대 경로 보정
+    image_path = result['image_path']
+    rel_path = image_path.split("static/")[-1] if "static/" in image_path else image_path
+
     return render_template('recommend_result.html',
-                           result=result,
-                           image_path=result['image_path'])
+                       result=result,
+                       image_path=rel_path)
 
 # 마이페이지 라우터
 @app.route('/my_page')
