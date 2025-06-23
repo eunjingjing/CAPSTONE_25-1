@@ -12,7 +12,9 @@ model = YOLO(MODEL_PATH)
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...),
-    handedness: str = Form(...)
+    handedness: str = Form(...),
+    lifestyle: str = Form(...),
+    purpose: str = Form(...)
 ):
     # 1. 이미지 저장
     image_id = str(uuid.uuid4())
@@ -21,7 +23,14 @@ async def predict(
         shutil.copyfileobj(file.file, buffer)
 
     # 2. 분석 수행
-    result = recommend_for_image(file_path, handedness=handedness, user_overrides={})
+    result = recommend_for_image(
+        file_path,
+        handedness=handedness,
+        user_overrides={
+            "라이프스타일": lifestyle,
+            "사용목적": purpose.split(',') if purpose else []
+        }
+    )
     feedback = result["feedback"]
     score = result["score"]
     breakdown = result.get("breakdown", {})
