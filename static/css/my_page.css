@@ -1,0 +1,56 @@
+.mypage-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+.record-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.record-card:hover {
+    transform: translateY(-5px);
+}
+.record-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+.record-card .info {
+    padding: 10px;
+    font-family: 'Noto Sans KR';
+}
+.modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    width: 400px;
+    text-align: center;
+}
+.modal img {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+.close-btn {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: #004D4D;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
