@@ -358,7 +358,7 @@ def visualize_desk_grid(
             pt1 = (c * cell_w, desk_top + r * cell_h)
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
             cv2.rectangle(img, pt1, pt2, (0, 0, 0), 2)
-            region_key = get_region_key_from_grid((c, r))
+            region_key = get_region_key_from_grid((r, c))
             label = REGION_KR[region_key]
             cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
 
