@@ -325,32 +325,41 @@ def visualize_desk_grid(
     cell_h = (desk_bottom - desk_top) // rows
 
     region_cells = {
+        "left_top": [(0, 0)],
         "top": [(0, 1), (0, 2)],
-        "left": [(0, 0), (1, 0), (2, 0)],
-        "right": [(0, 3), (1, 3), (2, 3)],
+        "right_top": [(0, 3)],
+        "left": [(1, 0), (2, 0)],
+        "right": [(1, 3), (2, 3)],
         "center": [(1, 1), (1, 2), (2, 1), (2, 2)]
     }
     region_colors = {
+        "left_top": (255, 204, 255),
         "top": (255, 204, 204),
+        "right_top": (255, 255, 204),
         "left": (204, 229, 255),
         "right": (204, 255, 229),
-        "center": (255, 255, 204)
+        "center": (255, 255, 255)
     }
 
-    # 각 셀 채우기
+    overlay = img.copy()
+    alpha = 0.4
+
     for region, cells in region_cells.items():
+        color = region_colors[region]
         for (r, c) in cells:
             pt1 = (c * cell_w, desk_top + r * cell_h)
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
-            cv2.rectangle(img, pt1, pt2, region_colors[region], thickness=-1)
+            cv2.rectangle(overlay, pt1, pt2, color, thickness=-1)
 
-    # 셀 테두리 + 라벨
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+
     for r in range(rows):
         for c in range(cols):
             pt1 = (c * cell_w, desk_top + r * cell_h)
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
             cv2.rectangle(img, pt1, pt2, (0, 0, 0), 2)
-            label = f"[{r},{c}]"
+            region_key = get_region_key_from_grid((c, r))
+            label = REGION_KR[region_key]
             cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
 
     cv2.imwrite(output_path, img)
