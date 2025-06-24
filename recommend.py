@@ -18,24 +18,29 @@ CLASS_NAMES = [
     "tissue", "tower-pc", "trash", "watch"
 ]
 
-GROUPS = {
+CLASSIFIED_GROUP = {
     "books": ["books", "paper", "post-it"],
     "stationery": ["pen", "pencil case", "scissors", "glue", "tape", "eraser", "stapler", "correction-tape", "pen holder", "ruler"],
-    "it": ["laptop", "keyboard-pc", "monitor-pc", "mouse-pc", "tablet-pc", "mic-pc", "headset", "speakers-pc", "tower-pc", "gamepad", "phone", "earphone"],
-    "trash": ["food", "drink", "trash", "snack"],
-    "personal": ["glasses", "cosmetic", "bag", "watch"],
-    "photo": ["photo"],
-    "calendar": ["calendar"],
-    "goods": ["goods"]
+    "foods": ["food", "snack"],
+    "goods" : ["goods"],
+    "cosmetic" : ["cosmetic"]
+}
+
+GROUP_KR = {
+    "books": "책류",
+    "stationery": "필기구류",
+    "goods": "굿즈",
+    "cosmetic": "화장품"
 }
 
 STUDY_OBJECTS = {"books", "pen", "ruler", "eraser", "glue", "paper", "post-it", 
                  "tape", "scissors", "stapler", "stopwatch", "tablet-pc", "correction-tape"}
+
 COMPUTER_OBJECTS = {"monitor-pc", "keyboard-pc", "mouse-pc", "laptop", "tablet-pc", 
                     "headset", "mic-pc", "speakers-pc", "tower-pc"}
 
-
 EXCLUDE_CLASSES_BACKGROUND = {"monitor-pc", "photo", "goods", "post-it"}
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(BASE_DIR, "data", "classes_weights.csv")
 WEIGHTS_DF = pd.read_csv(CSV_PATH)
@@ -146,14 +151,14 @@ def analyze_objects_by_grid(
     for obj in objects:
         x1, y1, x2, y2, cls_id = obj
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-        if not (desk_top <= cy <= desk_bottom):
+        if not (desk_top <= cy <= desk_bottom): # 책상 위에 존재하는 객체만 그리드 매핑
             continue
         grid_r = min(max(int((cy - desk_top) // cell_h), 0), rows-1)
         grid_c = min(max(int(cx // cell_w), 0), cols-1)
         grid, label = (grid_r, grid_c), CLASS_NAMES[cls_id]
-        grid_objects[grid].append(label)
-        label_grid_map[label].append(grid)
-        object_info.append((label, grid, (cx, cy)))
+        grid_objects[grid].append(label)    # 각 그리드 셀에 어떤 객체가 있는지
+        label_grid_map[label].append(grid)  # 각 객체가 어떤 그리드 셀에 포함되는지
+        object_info.append((label, grid, (cx, cy))) # 각 객체별 lable, 그리드 셀 위치, 중심 좌표
     return grid_objects, label_grid_map, object_info
 
 def compute_recommendations(
@@ -172,6 +177,11 @@ def compute_recommendations(
 
     for label in detected_labels:
         row = weights_df.loc[label]
+        # 사진은 배치 추천 건너뜀
+        if label == "photo":
+            recommendations[label] = "'사진'은(는) 벽에 붙이거나 앨범에 보관하세요."
+            continue
+        # 가방 & 쓰레기는 배치 추천 건너뜀
         if row["base_importance"] == 0:
             recommendations[label] = f"'{label}'은(는) 책상 위에서 치워주세요."
             continue
@@ -180,19 +190,28 @@ def compute_recommendations(
         hand_bias = [0, 0, 0, 0]
         if row["hand_sensitive"]:
             if handedness == "왼손잡이":
-                hand_bias = [0, 0.2, 0.5, 1.0]
-            elif handedness == "오른손잡이":
                 hand_bias = [1.0, 0.5, 0.2, 0]
+            elif handedness == "오른손잡이":
+                hand_bias = [0, 0.2, 0.5, 1.0]
 
         # 위치별 점수 계산
         # position_matrix = np.copy(base_position_weight)
         position_matrix = np.zeros((rows, cols))
         for y in range(rows):
                 for x in range(cols):
-                    # 위치 기반 유사도 계산
-                    x_center_similarity = 1 - abs(x - 1.5) / 1.5   # 중심(1,2)일수록 1
-                    y_lower_similarity = y / 2.0                   # 하단(2)일수록 1
-                    weight_score = x_center_similarity * row["x_weight"] + y_lower_similarity * row["y_weight"]
+                    # x축
+                    x_center_score = 1 - abs(x - 1.5) / 1.5
+                    x_side_score = 1 if x in [0, 3] else 0
+                    x_weight_norm = (row["x_weight"] - 1) / 2  # 1~3 → 0~1
+                    x_score = x_center_score * x_weight_norm + x_side_score * (1 - x_weight_norm)
+
+                    # y축
+                    y_bottom_score = y / 2.0
+                    y_top_score = 1 if y == 0 else 0
+                    y_weight_norm = (row["y_weight"] - 1) / 1  # 1~2 → 0~1
+                    y_score = y_bottom_score * y_weight_norm + y_top_score * (1 - y_weight_norm)
+
+                    weight_score = x_score + y_score
 
                     # 목적에 따른 위치 보너스
                     usage_bonus = 0
@@ -206,10 +225,13 @@ def compute_recommendations(
                     score += usage_bonus    # 사용 목적에 따른 가중치
                     score += hand_bias[x]   # 손잡이 가중치
 
-                    # 주요 객체는 중심 가중치 부여
-                    center_similarity = 1 - (abs(x - 1.5) / 1.5 + abs(y - 1.5) / 1.5) / 2
-                    base_importance_bonus = center_similarity * row["base_importance"]
-                    score += base_importance_bonus
+                    base_importance_norm = (row["base_importance"] - 1) / 3  # 1~4 → 0~1
+                    # 중심 4셀
+                    is_center = (y, x) in [(1,1), (1,2), (2,1), (2,2)]
+                    if is_center:
+                        score += base_importance_norm
+                    else:
+                        score += (1 - base_importance_norm)
 
                     position_matrix[y, x] = score
 
@@ -246,49 +268,118 @@ def compute_overlap_penalty(boxes: List[List[float]], threshold: float = 0.6) ->
 # 점수 산정 함수
 def compute_organization_score(
     label_grid_map: Dict[str, List[Tuple[int, int]]],
+    grid_objects: Dict[Tuple[int,int], List[str]],
     boxes: List[List[float]],
     weights_map: Dict[str, dict],
+    weights_df: pd.DataFrame,
+    lifestyle: str,
+    usage: List[str],
     rows: int = 3,
     cols: int = 4
 ) -> Tuple[int, Dict[str, int]]:
-
+    weights_df = weights_df.set_index("class")
     score = 100
     breakdown = {}
 
-    # 1. 과다 배치 패널티
-    for label, info in weights_map.items():
-        max_count = info.get("max_acceptable_count", None)
-        over_penalty = info.get("over_count_penalty", 5)
-        if max_count is not None:
-            count = len(label_grid_map.get(label, []))
-            if count > max_count:
-                penalty = (count - max_count) * over_penalty
-                score -= penalty
-                breakdown[f"{label} 과다"] = -penalty
+    # 1. 음식/음료 감점
+    for food_lable in CLASSIFIED_GROUP["foods"]:
+        if food_lable in label_grid_map:
+            row = weights_df.loc[food_lable]
+            name_kr = row["korean_name"]
+            score -= 5
+            breakdown[f"{name_kr} 감점 : '{name_kr}'은(는) 먹은 후엔 치워주세요!"] = -5
 
-    # 2. 책 분산 감점
-    if "books" in label_grid_map and len(set(label_grid_map["books"])) >= 3:
-        score -= 20
-        breakdown["책 분산"] = -20
+    if "drink" in label_grid_map and len(label_grid_map["drink"]) > 1:
+        score -= 5
+        breakdown["음료 과다 감점 : 다 마신 음료는 치워주세요!"] = -5
 
-    # 5. 그룹 균형 점검 (stationery)
-    stationery_labels = [
-        "pen", "pencil case", "scissors", "glue", "tape", "eraser", "stapler",
-        "correction-tape", "pen holder", "ruler"
-    ]
-    counter = Counter()
-    for label in stationery_labels:
-        for grid in label_grid_map.get(label, []):
-            counter[grid] += 1
-    if len(counter) >= 4:
-        score -= 8
-        breakdown["문구류 흩어짐"] = -8
-
-    # 6. 겹침 패널티
+    # 2. 사물 겹침 감점
     overlap_penalty = compute_overlap_penalty(boxes)
     if overlap_penalty > 0:
         score -= overlap_penalty
         breakdown["객체 겹침 감점"] = -overlap_penalty
+
+        # region별 객체 수 집계
+        region_object_count = {region: 0 for region in REGION_KR.keys()}
+        for grid, labels in grid_objects.items():
+            region = get_region_key_from_grid(grid)
+            region_object_count[region] += len(labels)
+
+        # 가장 객체가 많은 region 찾기
+        most_crowded_region = max(region_object_count, key=region_object_count.get)
+        region_kr = region_to_kr(most_crowded_region)
+        breakdown[f"객체 겹침 감점 : 특히 {region_kr} 구역이 복잡해요!"] = -overlap_penalty
+
+    # 3. 그룹별 과다 배치 패널티 (라이프스타일, 사용 목적 반영)
+    if lifestyle == "미니멀리스트":
+        max_allowed = {
+            "books": 1,
+            "stationery": 3,
+            "goods": 2,
+            "cosmetic": 1
+        }
+    elif lifestyle == "맥시멀리스트":
+        max_allowed = {
+            "books": 3,
+            "stationery": 6,
+            "goods": 6,
+            "cosmetic": 3
+        }
+    else :
+        max_allowed = {
+            "books": 2,
+            "stationery": 4,
+            "goods": 4,
+            "cosmetic": 2
+        }
+
+    if "공부 / 취미" in usage:
+        max_allowed["books"] += 1
+        max_allowed["stationery"] += 2
+
+    for group, labels in CLASSIFIED_GROUP.items():
+        if group not in max_allowed:
+            continue
+        count = sum(len(label_grid_map.get(label, [])) for label in labels)
+        if count > max_allowed[group]:
+            penalty = (count - max_allowed[group]) * 5
+            score -= penalty
+            group_kr = GROUP_KR.get(group, group)
+            breakdown[f"{group_kr} 과다 감점 : '{group_kr}' 이(가) 너무 많아요. 지금 사용하지 않는 물건은 치우거나 수납해보세요!"] = -penalty
+
+    # 4. 그룹별 분산 감점 (books, stationery)
+    for group in ["books", "stationery"]:
+        labels = CLASSIFIED_GROUP[group]
+        # 해당 그룹에 속한 객체들이 실제로 어느 region에 있는지 집계
+        region_set = set()
+        for label in labels:
+            for grid in label_grid_map.get(label, []):
+                region = get_region_key_from_grid(grid)
+                region_set.add(region)
+        # 2개 이상 region에 분산되어 있으면 감점
+        if len(region_set) >= 2:
+            penalty = 8  # 감점치 예시
+            score -= penalty
+            group_kr = GROUP_KR.get(group, group)
+            breakdown[f"{group_kr} 분산 감점 : '{group_kr}'가 여러 구역에 흩어져 있습니다."] = -penalty
+
+        for label, info in weights_map.items():
+            max_count = info.get("max_acceptable_count", None)
+            over_penalty = info.get("over_count_penalty", 5)
+            if max_count is not None:
+                count = len(label_grid_map.get(label, []))
+                if count > max_count:
+                    penalty = (count - max_count) * over_penalty
+                    score -= penalty
+                    breakdown[f"{label} 과다"] = -penalty
+
+    # 5. 쓰레기(trash) 감점 (최대 15점까지만 감점)
+    trash_count = len(label_grid_map.get("trash", []))
+    if trash_count > 0:
+        penalty_per_trash = 5  # 예시: 쓰레기 1개당 5점 감점
+        total_penalty = min(trash_count * penalty_per_trash, 15)
+        score -= total_penalty
+        breakdown["쓰레기 감점 : 쓰레기는 바로 치워주세요!"] = -total_penalty
 
     return max(score, 0), breakdown
 
@@ -313,32 +404,41 @@ def visualize_desk_grid(
     cell_h = (desk_bottom - desk_top) // rows
 
     region_cells = {
+        "left_top": [(0, 0)],
         "top": [(0, 1), (0, 2)],
-        "left": [(0, 0), (1, 0), (2, 0)],
-        "right": [(0, 3), (1, 3), (2, 3)],
+        "right_top": [(0, 3)],
+        "left": [(1, 0), (2, 0)],
+        "right": [(1, 3), (2, 3)],
         "center": [(1, 1), (1, 2), (2, 1), (2, 2)]
     }
     region_colors = {
+        "left_top": (255, 204, 255),
         "top": (255, 204, 204),
+        "right_top": (255, 255, 204),
         "left": (204, 229, 255),
         "right": (204, 255, 229),
-        "center": (255, 255, 204)
+        "center": (255, 255, 255)
     }
 
-    # 각 셀 채우기
+    overlay = img.copy()
+    alpha = 0.4
+
     for region, cells in region_cells.items():
+        color = region_colors[region]
         for (r, c) in cells:
             pt1 = (c * cell_w, desk_top + r * cell_h)
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
-            cv2.rectangle(img, pt1, pt2, region_colors[region], thickness=-1)
+            cv2.rectangle(overlay, pt1, pt2, color, thickness=-1)
 
-    # 셀 테두리 + 라벨
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+
     for r in range(rows):
         for c in range(cols):
             pt1 = (c * cell_w, desk_top + r * cell_h)
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
             cv2.rectangle(img, pt1, pt2, (0, 0, 0), 2)
-            label = f"[{r},{c}]"
+            region_key = get_region_key_from_grid((r, c))
+            label = REGION_KR[region_key]
             cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
 
     cv2.imwrite(output_path, img)
@@ -392,7 +492,8 @@ def recommend_for_image(image_path: str, handedness: str, user_overrides: dict):
         print(f"🏷️ 탐지된 라벨: {detected_labels}")
 
         # 정돈 점수 및 감점 breakdown
-        score, breakdown = compute_organization_score(label_grid_map, objs, WEIGHTS_MAP, lifestyle)
+        boxes = [list(map(float, obj[:4])) for obj in objs] ## 만약 오류나면 여기부터 고쳐보기 (boxes -> objs)
+        score, breakdown = compute_organization_score(label_grid_map, grid_objects, boxes, WEIGHTS_MAP, WEIGHTS_DF, lifestyle, usage)
 
         # 피드백 구성
         user_feedback = list(recommendations.values())

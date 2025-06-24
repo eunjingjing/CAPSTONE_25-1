@@ -25,7 +25,7 @@ load_dotenv()
 # Flask 보안 키 설정 (.env에서 가져옴)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 if not app.config['SECRET_KEY']:
-    print("❗ 환경변수 SECRET_KEY가 설정되지 않았습니다.")
+    print("환경변수 SECRET_KEY가 설정되지 않았습니다.")
 
 # Flask-Mail 설정
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -73,16 +73,16 @@ def send_to_runpod(image_path, handedness, lifestyle, purpose):
         data = {"handedness": handedness, "lifestyle": lifestyle, "purpose": purpose}
         try:
             response = requests.post(runpod_url, files=files, data=data, timeout=120)
-            print("📬 RunPod 응답 코드:", response.status_code)
-            print("📄 RunPod 응답 원문:", response.text)
+            print("RunPod 응답 코드:", response.status_code)
+            print("RunPod 응답 원문:", response.text)
             response.raise_for_status()
             result = response.json()
             if "score" not in result or "feedback" not in result:
-                print("⚠️ RunPod 응답에 필수 필드 누락됨")
+                print("RunPod 응답에 필수 필드 누락됨")
                 return {"score": 0, "feedback": ["RunPod 응답에 필수 필드가 누락되었습니다."], "breakdown": "error", "image_path": ""}
             return result
         except Exception as e:
-            print("❌ RunPod 요청 실패:", str(e))
+            print("RunPod 요청 실패:", str(e))
             return {"score": 0, "feedback": ["RunPod 요청 실패: " + str(e)], "breakdown": "error", "image_path": ""}
 
 
@@ -207,10 +207,14 @@ def find_password():
 
         msg = Message('이룸 비밀번호 재설정 링크',
                       recipients=[email],
-                      body=f'비밀번호를 재설정하려면 아래 링크를 클릭하세요:\n{reset_url}\n\n이 링크는 1시간 후 만료됩니다.')
-        mail.send(msg)
-
-        return jsonify({"success": True, "message": "비밀번호 재설정 이메일을 전송했습니다."})
+                      body=f'비밀번호를 재설정하려면 아래 링크를 클릭하세요:\n{reset_url}\n\n이 링크는 5분 후 만료됩니다.')
+        try:
+            mail.send(msg)
+            print(f"[이메일 발송 성공] 수신자: {email}")
+            return jsonify({"success": True, "message": "비밀번호 재설정 이메일을 전송했습니다."})
+        except Exception as e:
+            print(f"[이메일 발송 실패] 수신자: {email} | 오류: {str(e)}")
+            return jsonify({"success": False, "message": "메일 발송에 실패했습니다. 다시 시도해주세요."})
 
     return render_template('find_password.html')
 
@@ -218,11 +222,12 @@ def find_password():
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     try:
-        email = serializer.loads(token, salt='reset-password', max_age=3600)
+        email = serializer.loads(token, salt='reset-password', max_age=300)
+
     except SignatureExpired:
-        return jsonify({"success": False, "message": "링크가 만료되었습니다."})
+        return render_template("expired_link.html", message="비밀번호 재설정 링크가 만료되었습니다.")
     except BadSignature:
-        return jsonify({"success": False, "message": "잘못된 링크입니다."})
+        return render_template("expired_link.html", message="잘못된 비밀번호 재설정 링크입니다.")
 
     if request.method == 'POST':
         new_password = request.form['password']
@@ -243,7 +248,7 @@ def reset_password(token):
 @csrf.exempt
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    print("🔥 recommend() 호출됨")
+    print("recommend() 호출됨")
     user_id = session.get('user_id', None)
     image = request.files['image']
     hand = request.form.get('hand')
@@ -267,14 +272,14 @@ def recommend():
         purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
     )
     
-    print("📦 EC2 수신된 RunPod 결과:", flush=True)
-    print("📌 점수:", result.get("score"), flush=True)
-    print("📌 피드백:", result.get("feedback"), flush=True)
-    print("📌 이미지 경로:", result.get("image_path"), flush=True)
+    print("EC2 수신된 RunPod 결과:", flush=True)
+    print("점수:", result.get("score"), flush=True)
+    print("피드백:", result.get("feedback"), flush=True)
+    print("이미지 경로:", result.get("image_path"), flush=True)
 
     # RunPod 응답 유효성 확인
     if "score" not in result or "feedback" not in result:
-        print("❌ RunPod 응답에 필수 필드가 없습니다.")
+        print("RunPod 응답에 필수 필드가 없습니다.")
         return "이미지 분석 결과가 유효하지 않습니다.", 500
 
     # RunPod 응답 수신 후 → 이미지 저장
@@ -289,7 +294,7 @@ def recommend():
         result["image_path"] = ec2_image_path  # HTML에서 사용할 경로로 업데이트
 
 
-    print("✅ RunPod 응답 수신 완료")
+    print("RunPod 응답 수신 완료")
 
     new_image = Image(
         이미지ID=uuid.uuid4().hex,
@@ -312,7 +317,7 @@ def recommend():
     db.session.add(new_rec)
     db.session.commit()
 
-    print("✅ DB 저장 완료")
+    print("DB 저장 완료")
 
     # image_path 상대 경로 보정
     image_path = result['image_path']
@@ -345,9 +350,11 @@ def my_page():
 
     record_list = []
     for row in records:
+        image_path = row.이미지경로.replace('static/', '')  # 'static/' 제거
+
         record_list.append({
             'id': row.추천ID,
-            'image_path': row.이미지경로,
+            'image_path': image_path,
             'upload_date': row.추천일시.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S'),
             'score': row.정돈점수,
             'comment': row.피드백 if row.피드백 else '-'

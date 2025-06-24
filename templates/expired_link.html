@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>링크 오류</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-box">
+      <h2>{{ message }}</h2>
+      <a href="{{ url_for('find_password') }}" class="button">비밀번호 찾기 페이지로 돌아가기</a>
+    </div>
+  </div>
+</body>
+</html>
