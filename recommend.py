@@ -189,10 +189,19 @@ def compute_recommendations(
         position_matrix = np.zeros((rows, cols))
         for y in range(rows):
                 for x in range(cols):
-                    # 위치 기반 유사도 계산
-                    x_center_similarity = 1 - abs(x - 1.5) / 1.5   # 중심(1,2)일수록 1
-                    y_lower_similarity = y / 2.0                   # 하단(2)일수록 1
-                    weight_score = x_center_similarity * row["x_weight"] + y_lower_similarity * row["y_weight"]
+                    # x축
+                    x_center_score = 1 - abs(x - 1.5) / 1.5
+                    x_side_score = 1 if x in [0, 3] else 0
+                    x_weight_norm = (row["x_weight"] - 1) / 2  # 1~3 → 0~1
+                    x_score = x_center_score * x_weight_norm + x_side_score * (1 - x_weight_norm)
+
+                    # y축
+                    y_bottom_score = y / 2.0
+                    y_top_score = 1 if y == 0 else 0
+                    y_weight_norm = (row["y_weight"] - 1) / 1  # 1~2 → 0~1
+                    y_score = y_bottom_score * y_weight_norm + y_top_score * (1 - y_weight_norm)
+
+                    weight_score = x_score + y_score
 
                     # 목적에 따른 위치 보너스
                     usage_bonus = 0
@@ -206,10 +215,13 @@ def compute_recommendations(
                     score += usage_bonus    # 사용 목적에 따른 가중치
                     score += hand_bias[x]   # 손잡이 가중치
 
-                    # 주요 객체는 중심 가중치 부여
-                    center_similarity = 1 - (abs(x - 1.5) / 1.5 + abs(y - 1.5) / 1.5) / 2
-                    base_importance_bonus = center_similarity * row["base_importance"]
-                    score += base_importance_bonus
+                    base_importance_norm = (row["base_importance"] - 1) / 3  # 1~4 → 0~1
+                    # 중심 4셀
+                    is_center = (y, x) in [(1,1), (1,2), (2,1), (2,2)]
+                    if is_center:
+                        score += base_importance_norm
+                    else:
+                        score += (1 - base_importance_norm)
 
                     position_matrix[y, x] = score
 
