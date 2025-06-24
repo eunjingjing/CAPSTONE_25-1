@@ -350,11 +350,12 @@ def my_page():
 
     record_list = []
     for row in records:
-        image_path = row.이미지경로.replace('static/', '')  # 'static/' 제거
+        image_path = row.이미지경로
+        rel_path = image_path.split("static/")[-1] if "static/" in image_path else image_path
 
         record_list.append({
             'id': row.추천ID,
-            'image_path': image_path,
+            'image_path': rel_path,
             'upload_date': row.추천일시.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S'),
             'score': row.정돈점수,
             'comment': row.피드백 if row.피드백 else '-'
