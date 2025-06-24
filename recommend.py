@@ -180,9 +180,9 @@ def compute_recommendations(
         hand_bias = [0, 0, 0, 0]
         if row["hand_sensitive"]:
             if handedness == "왼손잡이":
-                hand_bias = [0, 0.2, 0.5, 1.0]
-            elif handedness == "오른손잡이":
                 hand_bias = [1.0, 0.5, 0.2, 0]
+            elif handedness == "오른손잡이":
+                hand_bias = [0, 0.2, 0.5, 1.0]
 
         # 위치별 점수 계산
         # position_matrix = np.copy(base_position_weight)
