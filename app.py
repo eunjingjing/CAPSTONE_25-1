@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import os
 import uuid
 import datetime
+from pytz import timezone
 import requests
 import base64
 from werkzeug.utils import secure_filename
@@ -54,6 +55,8 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+# 한국 시간대 설정
+KST = timezone("Asia/Seoul")
 
 # DB 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@15.164.4.130:3306/desk'
@@ -292,7 +295,7 @@ def recommend():
         이미지ID=uuid.uuid4().hex,
         사용자ID=user_id,
         이미지경로=result['image_path'],
-        업로드일시=datetime.datetime.now()
+        업로드일시=datetime.datetime.now(KST)
     )
     db.session.add(new_image)
     db.session.commit()
@@ -304,7 +307,7 @@ def recommend():
         이미지ID=image_id,
         정돈점수=result['score'],
         피드백='\n'.join(result['feedback']),
-        추천일시=datetime.datetime.now()
+        추천일시=datetime.datetime.now(KST)
     )
     db.session.add(new_rec)
     db.session.commit()
@@ -345,7 +348,7 @@ def my_page():
         record_list.append({
             'id': row.추천ID,
             'image_path': row.이미지경로,
-            'upload_date': row.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
+            'upload_date': row.추천일시.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S'),
             'score': row.정돈점수,
             'comment': row.피드백 if row.피드백 else '-'
         })
