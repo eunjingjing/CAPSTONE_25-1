@@ -27,7 +27,7 @@ CLASSIFIED_GROUP = {
 }
 
 GROUP_KR = {
-    "books": "책류",
+    "books": "책/종이류",
     "stationery": "필기구류",
     "goods": "굿즈",
     "cosmetic": "화장품"
@@ -181,9 +181,13 @@ def compute_recommendations(
         if label == "photo":
             recommendations[label] = "'사진'은(는) 벽에 붙이거나 앨범에 보관하세요."
             continue
+        # 책/종이류는 배치 추천 건너뜀 -> 점수 반영 후 정리 방식 추천
+        if label in CLASSIFIED_GROUP["books"]:
+            continue
         # 가방 & 쓰레기는 배치 추천 건너뜀
         if row["base_importance"] == 0:
-            recommendations[label] = f"'{label}'은(는) 책상 위에서 치워주세요."
+            name_kr = row["korean_name"]
+            recommendations[label] = f"'{name_kr}'은(는) 책상 위에서 치워주세요."
             continue
 
         # 손잡이 반영: 우측 선호 또는 좌측 선호에 따라 열 가중치 차등
@@ -282,22 +286,27 @@ def compute_organization_score(
     breakdown = {}
 
     # 1. 음식/음료 감점
-    for food_lable in CLASSIFIED_GROUP["foods"]:
-        if food_lable in label_grid_map:
-            row = weights_df.loc[food_lable]
+    food_penalty_total = 0
+    for food_label in CLASSIFIED_GROUP["foods"]:
+        if food_label in label_grid_map:
+            row = weights_df.loc[food_label]
             name_kr = row["korean_name"]
-            score -= 5
+            food_penalty_total += 5
             breakdown[f"{name_kr} 감점 : '{name_kr}'은(는) 먹은 후엔 치워주세요!"] = -5
+
+    # 음식 감점은 최대 10점까지만
+    food_penalty_total = min(food_penalty_total, 10)
+    score -= food_penalty_total
 
     if "drink" in label_grid_map and len(label_grid_map["drink"]) > 1:
         score -= 5
         breakdown["음료 과다 감점 : 다 마신 음료는 치워주세요!"] = -5
 
-    # 2. 사물 겹침 감점
+    # 2. 사물 겹침 감점 (최대 20점 감점)
     overlap_penalty = compute_overlap_penalty(boxes)
     if overlap_penalty > 0:
+        overlap_penalty = min(overlap_penalty, 20)
         score -= overlap_penalty
-        breakdown["객체 겹침 감점"] = -overlap_penalty
 
         # region별 객체 수 집계
         region_object_count = {region: 0 for region in REGION_KR.keys()}
@@ -337,12 +346,28 @@ def compute_organization_score(
         max_allowed["books"] += 1
         max_allowed["stationery"] += 2
 
+    # 중심 구역 내 책/종이류 과다 감점
+    center_cells = [(1,1), (1,2), (2,1), (2,2)]
+    books_labels = CLASSIFIED_GROUP["books"]
+    books_in_center = 0
+    for label in books_labels:
+        for grid in label_grid_map.get(label, []):
+            if grid in center_cells:
+                books_in_center += 1
+    if books_in_center > max_allowed["books"]:
+        penalty = (books_in_center - max_allowed["books"]) * 5
+        penalty = min(penalty, 15)  # 최대 15점까지만 감점
+        score -= penalty
+        breakdown[f"책/종이류 과다 감점 : 중앙에 책류가 너무 많아요. 지금 사용하는 책/종이류를 제외하고는 책꽂이에 꽂거나 한 곳에 모아보세요!"] = -penalty
+
+    # 책/종이류를 제외한 나머지 그룹에 한하여 과다 감점 적용
     for group, labels in CLASSIFIED_GROUP.items():
-        if group not in max_allowed:
+        if group not in max_allowed or group == "books":
             continue
         count = sum(len(label_grid_map.get(label, [])) for label in labels)
         if count > max_allowed[group]:
             penalty = (count - max_allowed[group]) * 5
+            penalty = min(penalty, 15)  # 그룹별 최대 15점 감점
             score -= penalty
             group_kr = GROUP_KR.get(group, group)
             breakdown[f"{group_kr} 과다 감점 : '{group_kr}' 이(가) 너무 많아요. 지금 사용하지 않는 물건은 치우거나 수납해보세요!"] = -penalty
@@ -358,20 +383,10 @@ def compute_organization_score(
                 region_set.add(region)
         # 2개 이상 region에 분산되어 있으면 감점
         if len(region_set) >= 2:
-            penalty = 8  # 감점치 예시
+            penalty = 10
             score -= penalty
             group_kr = GROUP_KR.get(group, group)
             breakdown[f"{group_kr} 분산 감점 : '{group_kr}'가 여러 구역에 흩어져 있습니다."] = -penalty
-
-        for label, info in weights_map.items():
-            max_count = info.get("max_acceptable_count", None)
-            over_penalty = info.get("over_count_penalty", 5)
-            if max_count is not None:
-                count = len(label_grid_map.get(label, []))
-                if count > max_count:
-                    penalty = (count - max_count) * over_penalty
-                    score -= penalty
-                    breakdown[f"{label} 과다"] = -penalty
 
     # 5. 쓰레기(trash) 감점 (최대 15점까지만 감점)
     trash_count = len(label_grid_map.get("trash", []))
@@ -438,8 +453,10 @@ def visualize_desk_grid(
             pt2 = ((c + 1) * cell_w, desk_top + (r + 1) * cell_h)
             cv2.rectangle(img, pt1, pt2, (0, 0, 0), 2)
             region_key = get_region_key_from_grid((r, c))
-            label = REGION_KR[region_key]
-            cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+            ## 한글 깨짐 버그 (임시로 영어로 구역 출력)
+            # label = REGION_KR[region_key]
+            # cv2.putText(img, label, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
+            cv2.putText(img, region_key, (pt1[0] + 10, pt1[1] + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (50, 50, 50), 2)
 
     cv2.imwrite(output_path, img)
     return output_path
