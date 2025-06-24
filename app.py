@@ -8,15 +8,24 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from dotenv import load_dotenv
 import os
+import uuid
+import datetime
+from pytz import timezone
+import requests
+import base64
+from werkzeug.utils import secure_filename
+from recommend import recommend_for_image
 
-# Flask 앱 생성
-app = Flask(__name__)
+# Flask 앱 생성 및 정적파일 제어
+app = Flask(__name__, static_folder="static")
 
 # .env 불러오기
 load_dotenv()
 
 # Flask 보안 키 설정 (.env에서 가져옴)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+if not app.config['SECRET_KEY']:
+    print("❗ 환경변수 SECRET_KEY가 설정되지 않았습니다.")
 
 # Flask-Mail 설정
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -41,10 +50,13 @@ csrf = CSRFProtect(app)
 app.permanent_session_lifetime = timedelta(minutes=30)
 
 # 쿠키 보안 설정
+# HTTPS 환경에서만 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# HTTPS 환경에서만 활성화, HTTP에서 적용하면 세션 유지 안될 수 있음
-# app.config['SESSION_COOKIE_SECURE'] = True
+
+# 한국 시간대 설정
+KST = timezone("Asia/Seoul")
 
 # DB 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@15.164.4.130:3306/desk'
@@ -52,6 +64,26 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # DB 초기화
 db = SQLAlchemy(app)
+
+# RunPod에 이미지 전송 함수
+def send_to_runpod(image_path, handedness, lifestyle, purpose):
+    runpod_url = "https://zyek3om6cpaa60-80.proxy.runpod.net/predict"
+    with open(image_path, 'rb') as f:
+        files = {'file': f}
+        data = {"handedness": handedness, "lifestyle": lifestyle, "purpose": purpose}
+        try:
+            response = requests.post(runpod_url, files=files, data=data, timeout=120)
+            print("📬 RunPod 응답 코드:", response.status_code)
+            print("📄 RunPod 응답 원문:", response.text)
+            response.raise_for_status()
+            result = response.json()
+            if "score" not in result or "feedback" not in result:
+                print("⚠️ RunPod 응답에 필수 필드 누락됨")
+                return {"score": 0, "feedback": ["RunPod 응답에 필수 필드가 누락되었습니다."], "breakdown": "error", "image_path": ""}
+            return result
+        except Exception as e:
+            print("❌ RunPod 요청 실패:", str(e))
+            return {"score": 0, "feedback": ["RunPod 요청 실패: " + str(e)], "breakdown": "error", "image_path": ""}
 
 
 # DB 연결 확인 라우트
@@ -91,6 +123,15 @@ class Recommendation(db.Model):
     정돈점수 = db.Column(db.Integer)
     피드백 = db.Column(db.Text)
     추천일시 = db.Column(db.TIMESTAMP)
+
+# 이미지 모델 생성
+class Image(db.Model):
+    __tablename__ = '이미지'
+
+    이미지ID = db.Column(db.String(40), primary_key=True)
+    사용자ID = db.Column(db.String(30), nullable=False)
+    이미지경로 = db.Column(db.Text, nullable=False)
+    업로드일시 = db.Column(db.TIMESTAMP)
 
 # 회원가입 라우터
 @app.route('/sign-in', methods=['GET', 'POST'])
@@ -198,6 +239,89 @@ def reset_password(token):
 
     return render_template('reset_password.html', token=token)
 
+#배치 추천(RunPod 호출)
+@csrf.exempt
+@app.route('/recommend', methods=['POST'])
+def recommend():
+    print("🔥 recommend() 호출됨")
+    user_id = session.get('user_id', None)
+    image = request.files['image']
+    hand = request.form.get('hand')
+    lifestyle = request.form.get('lifestyle')
+    purpose_raw = request.form.get('purpose')
+    purpose_list = [p.strip() for p in purpose_raw.split(',') if p.strip()]
+
+    if not image:
+        return "이미지가 업로드되지 않았습니다.", 400
+
+    filename = uuid.uuid4().hex + os.path.splitext(image.filename)[-1]
+    upload_path = os.path.join('static/uploads', filename)
+    os.makedirs('static/uploads', exist_ok=True)
+    image.save(upload_path)
+
+    print("📡 RunPod에 분석 요청 전송 중...")
+    result = send_to_runpod(
+        image_path=upload_path,
+        handedness=hand,
+        lifestyle=lifestyle,
+        purpose=','.join(purpose_list)  # RunPod에서는 문자열로 받게 처리
+    )
+    
+    print("📦 EC2 수신된 RunPod 결과:", flush=True)
+    print("📌 점수:", result.get("score"), flush=True)
+    print("📌 피드백:", result.get("feedback"), flush=True)
+    print("📌 이미지 경로:", result.get("image_path"), flush=True)
+
+    # RunPod 응답 유효성 확인
+    if "score" not in result or "feedback" not in result:
+        print("❌ RunPod 응답에 필수 필드가 없습니다.")
+        return "이미지 분석 결과가 유효하지 않습니다.", 500
+
+    # RunPod 응답 수신 후 → 이미지 저장
+    image_filename = result.get("image_filename", uuid.uuid4().hex + ".jpg")
+    image_base64 = result.get("image_base64", "")
+
+    if image_base64:
+        decoded_image = base64.b64decode(image_base64)
+        ec2_image_path = os.path.join("static/uploads", image_filename)
+        with open(ec2_image_path, "wb") as f:
+            f.write(decoded_image)
+        result["image_path"] = ec2_image_path  # HTML에서 사용할 경로로 업데이트
+
+
+    print("✅ RunPod 응답 수신 완료")
+
+    new_image = Image(
+        이미지ID=uuid.uuid4().hex,
+        사용자ID=user_id,
+        이미지경로=result['image_path'],
+        업로드일시=datetime.datetime.now(KST)
+    )
+    db.session.add(new_image)
+    db.session.commit()
+    image_id = new_image.이미지ID
+
+    new_rec = Recommendation(
+        추천ID=uuid.uuid4().hex,
+        사용자ID=user_id,
+        이미지ID=image_id,
+        정돈점수=result['score'],
+        피드백='\n'.join(result['feedback']),
+        추천일시=datetime.datetime.now(KST)
+    )
+    db.session.add(new_rec)
+    db.session.commit()
+
+    print("✅ DB 저장 완료")
+
+    # image_path 상대 경로 보정
+    image_path = result['image_path']
+    rel_path = image_path.split("static/")[-1] if "static/" in image_path else image_path
+
+    return render_template('recommend_result.html',
+                       result=result,
+                       image_path=rel_path)
+
 # 마이페이지 라우터
 @app.route('/my_page')
 def my_page():
@@ -221,98 +345,18 @@ def my_page():
 
     record_list = []
     for row in records:
+        image_path = row.이미지경로.replace('static/', '')  # 'static/' 제거
+
         record_list.append({
             'id': row.추천ID,
-            'image_path': row.이미지경로,
-            'upload_date': row.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
+            'image_path': image_path,
+            'upload_date': row.추천일시.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S'),
             'score': row.정돈점수,
             'comment': row.피드백 if row.피드백 else '-'
         })
 
     return render_template('my_page.html', records=record_list)
 
-# # 마이 페이지 라우터
-# @app.route('/my_page')
-# def my_page():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-    
-#     user_id = session['user_id']
-
-#     # # 해당 사용자에 대한 추천이력 조회
-#     # records = Recommendation.query.filter_by(사용자ID=user_id).order_by(Recommendation.추천일시.desc()).all()
-
-#     # 추천이력과 이미지 테이블을 조인하여 조회
-#     sql = text("""
-#         SELECT 
-#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
-#             이미지.이미지경로
-#         FROM 추천이력
-#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
-#         WHERE 추천이력.사용자ID = :user_id
-#         ORDER BY 추천이력.추천일시 DESC
-#     """)
-
-#     result = db.session.execute(sql, {'user_id': user_id})
-#     records = result.fetchall()
-
-#     # 템플릿으로 넘길 dict 가공
-#     record_list = [
-#         {
-#             'image_path' : r.이미지경로,
-#             'upload_date': r.추천일시.strftime('%Y-%m-%d %H:%M:%S'),
-#             'score': r.정돈점수,
-#             'comment': r.피드백
-#         } 
-#         for r in records
-#     ]
-
-#     return render_template('my_page.html', records=record_list)
-
-# # 이미지 경로 변환 (static 경로로 변환용)
-# def convert_image_path(raw_path):
-#     """
-#     DB에는 /home/ec2-user/data/images/1.jpeg 이런 식으로 저장돼있으므로
-#     웹에선 static 접근이 되도록 변환
-#     """
-#     filename = raw_path.split('/')[-1]
-#     return url_for('static', filename='uploads/' + filename)
-
-# # 마이 페이지 라우터 (수정 버전)
-# @app.route('/my_page')
-# def my_page():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-    
-#     user_id = session['user_id']
-
-#     # 추천이력과 이미지 테이블을 조인하여 조회
-#     sql = text("""
-#         SELECT 
-#             추천이력.추천ID, 추천이력.이미지ID, 추천이력.정돈점수, 추천이력.피드백, 추천이력.추천일시,
-#             이미지.이미지경로
-#         FROM 추천이력
-#         JOIN 이미지 ON 추천이력.이미지ID = 이미지.이미지ID
-#         WHERE 추천이력.사용자ID = :user_id
-#         ORDER BY 추천이력.추천일시 DESC
-#     """)
-
-#     result = db.session.execute(sql, {'user_id': user_id})
-#     records = result.fetchall()
-
-#     # DB 결과 가공
-#     record_list = []
-#     for row in records:
-#         record_list.append({
-#             'image_path': convert_image_path(row['이미지경로']),
-#             'upload_date': row['추천일시'].strftime('%Y-%m-%d %H:%M:%S'),
-#             'score': row['정돈점수'],
-#             'comment': row['피드백'] if row['피드백'] else '-'
-#         })
-
-#     return render_template('my_page.html', records=record_list)
-
-
-# run
+# RunPod 외부 접근 허용
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)

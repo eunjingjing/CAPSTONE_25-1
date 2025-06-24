@@ -320,3 +320,40 @@ footer {
 .no-data {
   text-align: center;
 }
+
+/* 결과 페이지 css */
+.result-container {
+  margin: 3vw;
+  padding: 2vw;
+  background: white;
+  border-radius: 30px;
+  font-family: 'NanumGothic', sans-serif;
+}
+
+.result-container h2 {
+  font-family: 'Jua', sans-serif;
+  font-size: 2.5vw;
+  margin-bottom: 2vw;
+}
+
+.result-section p {
+  font-size: 1.2vw;
+}
+
+.breakdown,
+.feedback {
+  margin-top: 1.5vw;
+}
+
+.breakdown h4,
+.feedback h4,
+.image-preview h4 {
+  font-size: 1.2vw;
+  margin-bottom: 0.8vw;
+}
+
+.breakdown ul,
+.feedback ul {
+  list-style-type: disc;
+  padding-left: 2vw;
+}

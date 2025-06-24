@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>이룸 | 분석 결과</title>
+
+  <!-- 폰트 및 아이콘 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=NanumGothic&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- ===== Header ===== -->
+  <header>
+    <div class="title">
+      <a href="{{ url_for('index') }}">이룸</a>
+      <p>정리와 배치를 통해 완성된 공간</p>
+    </div>
+    <div class="sign">
+      {% if 'user_id' in session %}
+        <a href="{{ url_for('my_page') }}">마이페이지</a>
+        <a href="{{ url_for('logout') }}">로그아웃</a>
+      {% else %}
+        <a href="{{ url_for('login') }}">로그인</a>
+        <a href="{{ url_for('sign_in') }}">회원가입</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- ===== 결과 출력 ===== -->
+  <div class="result-container">
+    <h2>📊 정리 분석 결과</h2>
+
+    {% if result %}
+    <div class="result-section">
+      <p><strong>정돈 점수:</strong> {{ result.score }}/100</p>
+
+      {% if result.breakdown and result.breakdown != "error" %}
+      <div class="breakdown">
+        <h4>🔻 감점 항목</h4>
+        <ul>
+          {% for reason, point in result.breakdown.items() %}
+            <li>{{ reason }}: {{ point }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if result.feedback is defined and result.feedback | length > 0 %}
+      <div class="feedback">
+        <h4>💡 피드백</h4>
+        <ul>
+          {% for fb in result.feedback %}
+            <li>{{ fb }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <div class="feedback">
+        <h4>💡 피드백</h4>
+        <p>피드백이 존재하지 않습니다.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="image-preview">
+      <h4>📷 업로드 이미지</h4>
+      {% if result.image_path %}
+        {% set image_file = result.image_path.split('static/')[-1] %}
+        <img src="{{ url_for('static', filename=image_file) }}" alt="분석 이미지"
+             style="max-width: 100%; border: 1px solid #ccc; border-radius: 8px;" />
+      {% else %}
+        <p>이미지를 표시할 수 없습니다.</p>
+      {% endif %}
+    </div>
+    {% else %}
+      <p>분석 결과를 불러올 수 없습니다.</p>
+    {% endif %}
+
+    <div style="margin-top: 30px;">
+      <a href="{{ url_for('index') }}" class="button">← 돌아가기</a>
+    </div>
+  </div>
+
+  <!-- ===== Footer ===== -->
+  <footer>
+    © 2025 Team Ω - Dong-Eui Univ. Computer Science Engineering<br />
+    권민정, 김지원, 이은진<br />
+    AI 기반 맞춤형 책상 정리 시스템 | All rights reserved.
+  </footer>
+</body>
+</html>

@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // 이미지 업로드
     const uploadBox = document.querySelector('.upload-box');
     const fileInput = document.getElementById('imgUpload');
     const icon = uploadBox.querySelector('.material-symbols-outlined');
@@ -67,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const purposeButtons = document.querySelectorAll('.purpose-group .btn-group button');
     const autoButton = document.querySelector('.auto-btn button');
 
-    // 주 사용 손 (3중 택1)
     handButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const isActive = btn.classList.contains('active');
@@ -77,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 라이프스타일 (2중 택1, 자동추천 해제)
     lifestyleButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const isActive = btn.classList.contains('active');
@@ -88,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 사용용도 (자율 다중선택, 자동추천 해제)
     purposeButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             btn.classList.toggle('active');
@@ -97,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 4자동추천 (라이프스타일, 사용용도 초기화)
     autoButton.addEventListener('click', () => {
         const isActive = autoButton.classList.contains('active');
         if (!isActive) {
@@ -110,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         checkReady();
     });
 
-    // 추천 버튼 활성화 조건
     function checkReady() {
         const hasImage = fileInput.files.length > 0;
         const handSelected = [...handButtons].some(b => b.classList.contains('active'));
@@ -119,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const purposeSelectedCount = [...purposeButtons].filter(b => b.classList.contains('active')).length;
 
         let valid = false;
-
         if (autoSelected) {
             valid = hasImage && handSelected;
         } else {
@@ -130,6 +123,20 @@ document.addEventListener('DOMContentLoaded', () => {
         recommendBtn.classList.toggle('enabled', valid);
     }
 
-    // 이미지 바뀔 때도 항상 활성화 체크
     fileInput.addEventListener('change', checkReady);
+
+    document.getElementById("recommendBtn").addEventListener("click", () => {
+        // e.preventDefault();
+        const hand = document.querySelector(".hand-group .btn-group .active")?.textContent.trim() || "";
+        const lifestyle = document.querySelector(".lifestyle-group .btn-group .active")?.textContent.trim() || "";
+        const purposeElems = document.querySelectorAll(".purpose-group .btn-group .active");
+        const purposes = [...purposeElems].map(el => el.textContent.trim()).join(",");
+
+        document.getElementById("handInput").value = hand;
+        document.getElementById("lifestyleInput").value = lifestyle;
+        document.getElementById("purposeInput").value = purposes;
+
+        console.log("✅ recommendForm submit 직전");
+        document.getElementById("recommendForm").submit();
+    });
 });
