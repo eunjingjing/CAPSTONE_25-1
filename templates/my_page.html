@@ -99,7 +99,7 @@
             data-date="{{ record.upload_date }}" 
             data-score="{{ record.score }}" 
             data-comment="{{ record.comment }}">
-          <img src="{{ url_for('static', filename=record.image_path.replace('static/', '')) }}" alt="업로드 이미지">
+          <img src="{{ url_for('static', filename=data-img.replace('static/', '')) }}" alt="업로드 이미지">
           <div class="info">
             <div>{{ record.upload_date }}</div>
           </div>
