@@ -42,37 +42,36 @@
       <canvas id="scoreGauge" data-score="{{ result.score }}"></canvas>
 
       {% if result.breakdown and result.breakdown != "error" %}
-      <details class="foldable">
         <div class="breakdown">
-          <h4>🔻 감점 항목</h4>
-          <summary></summary>
-          <ul>
-            {% for reason, point in result.breakdown.items() %}
-              <li>{{ reason }}: {{ point }}</li>
-            {% endfor %}
-          </ul>
+          🔻 감점 항목
+          <details class="foldable">
+            <ul>
+              {% for reason, point in result.breakdown.items() %}
+                <li>{{ reason }}: {{ point }}</li>
+              {% endfor %}
+            </ul>
+          </details>
         </div>
-      </details>
       {% endif %}
 
       {% if result.feedback is defined and result.feedback | length > 0 %}
-      <details class="foldable">
+
         <div class="feedback">
           <h4>💡 피드백</h4>
-          <summary></summary>
-          <ul>
-            {% for fb in result.feedback %}
-              <li>{{ fb }}</li>
-            {% endfor %}
-          </ul>
+          <details class="foldable">
+            <ul>
+              {% for fb in result.feedback %}
+                <li>{{ fb }}</li>
+              {% endfor %}
+            </ul>
+          </details>
         </div>
         {% else %}
         <div class="feedback">
           <h4>💡 피드백</h4>
-          <summary></summary>
           <p>피드백이 존재하지 않습니다.</p>
         </div>
-      </details>
+
       {% endif %}
     </div>
 
