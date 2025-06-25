@@ -54,3 +54,6 @@
     border-radius: 10px;
     cursor: pointer;
 }
+.no-data {
+  text-align: center;
+}

@@ -11,7 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@100..900&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=NanumGothic&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/result.css') }}">
 </head>
 <body>
   <!-- ===== Header ===== -->
@@ -38,7 +39,8 @@
     {% if result %}
     <div class="result-section">
       <p><strong>정돈 점수:</strong> {{ result.score }}/100</p>
-
+      <canvas id="scoreGauge" width="300" height="150" data-score="{{ result.score }}"></canvas>
+      
       {% if result.breakdown and result.breakdown != "error" %}
       <div class="breakdown">
         <h4>🔻 감점 항목</h4>
@@ -93,4 +95,7 @@
     AI 기반 맞춤형 책상 정리 시스템 | All rights reserved.
   </footer>
 </body>
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/result.js') }}"></script>
 </html>

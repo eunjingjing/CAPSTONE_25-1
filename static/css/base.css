@@ -1,0 +1,45 @@
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background-color: #A1E1E1;
+  margin: 0;
+  padding: 0;
+  color: #000;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1vw 3vw 0;
+  font-family: 'Jua';
+}
+
+.title {
+  font-size: 3vw;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.4vw;
+}
+
+.title p{
+  font-size: 2vw;
+}
+
+a {
+  text-decoration: none;
+  color: #000;
+}
+
+p {
+  margin: 0;
+}
+
+footer {
+  text-align: center;
+  font-size: 0.8vw;
+  padding: 20px;
+  color: #fff;
+  background: #004D4D;
+}

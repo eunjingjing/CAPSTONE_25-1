@@ -1,4 +1,4 @@
-body {
+/* body {
   font-family: 'Noto Sans KR', sans-serif;
   background-color: #A1E1E1;
   margin: 0;
@@ -34,7 +34,7 @@ a {
 
 p {
   margin: 0;
-}
+} */
 
 .to_home{
   font-size: 4rem;
@@ -188,13 +188,13 @@ p {
   font-family: 'Jua';
 }
 
-footer {
+/* footer {
   text-align: center;
   font-size: 0.8vw;
   padding: 20px;
   color: #fff;
   background: #004D4D;
-}
+} */
 
 .btn-group button.active {
   background-color: #004D4D;
@@ -225,7 +225,7 @@ footer {
   opacity: 1;
 }
 
-/* login 화면 css */
+/* login 화면 css
 .auth-container {
   display: flex;
   justify-content: center;
@@ -288,9 +288,9 @@ footer {
 .auth-links a {
   color: #004D4D;
   text-decoration: none;
-}
+} */
 
-/* 마이 페이지 css */
+/* 마이 페이지 css
 .record-table {
   width: 100%;
   border-collapse: collapse;
@@ -315,13 +315,11 @@ footer {
   background-color: #fff;
   min-height: 70vh;
   border-radius: 15px;
-}
+} */
 
-.no-data {
-  text-align: center;
-}
 
-/* 결과 페이지 css */
+
+/* 결과 페이지 css
 .result-container {
   margin: 3vw;
   padding: 2vw;
@@ -356,4 +354,4 @@ footer {
 .feedback ul {
   list-style-type: disc;
   padding-left: 2vw;
-}
+} */
