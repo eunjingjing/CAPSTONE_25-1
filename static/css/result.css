@@ -33,7 +33,7 @@
 .feedback ul {
   list-style-type: disc;
   padding-left: 2vw;
-  font-size: 1.7vw;
+  font-size: 1.6vw;
 }
 
 details.foldable {
@@ -54,5 +54,4 @@ details.foldable summary {
   width: 300px;
   height: 150px;
   display: block;
-  margin: 0 auto;
 }

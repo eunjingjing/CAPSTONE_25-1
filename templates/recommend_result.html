@@ -43,7 +43,7 @@
 
       {% if result.breakdown and result.breakdown != "error" %}
         <div class="breakdown">
-          🔻 감점 항목
+          <h4>🔻 감점 항목</h4>
           <details class="foldable">
             <ul>
               {% for reason, point in result.breakdown.items() %}
