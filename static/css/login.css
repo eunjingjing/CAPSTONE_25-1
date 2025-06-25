@@ -1,4 +1,9 @@
 /* login 화면 css */
+.to_home{
+  font-size: 4rem;
+  font-family: 'Jua';
+}
+
 .auth-container {
   display: flex;
   justify-content: center;
