@@ -4,6 +4,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const score = parseInt(canvas.dataset.score) || 0;
 
+  // 점수 구간에 따른 색상 설정
+  let color;
+  if (score >= 90) {
+    color = "#4CAF50"; // 초록
+  } else if (score >= 70) {
+    color = "#FFCA28"; // 노랑
+  } else if (score >= 50) {
+    color = "#FF7043"; // 주황
+  } else {
+    color = "#F44336"; // 빨강
+  }
+
   const ctx = canvas.getContext("2d");
   new Chart(ctx, {
     type: "doughnut",
@@ -12,7 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
       datasets: [
         {
           data: [score, 100 - score],
-          backgroundColor: ["#4CAF50", "#e0e0e0"],
+          backgroundColor: [color, "#e0e0e0"],
           borderWidth: 0,
         },
       ],
