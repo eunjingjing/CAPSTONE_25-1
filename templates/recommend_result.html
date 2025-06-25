@@ -40,32 +40,36 @@
     <div class="result-section">
       <p><strong>정돈 점수:</strong> {{ result.score }}/100</p>
       <canvas id="scoreGauge" width="300" height="150" data-score="{{ result.score }}"></canvas>
-      
+
       {% if result.breakdown and result.breakdown != "error" %}
-      <div class="breakdown">
-        <h4>🔻 감점 항목</h4>
-        <ul>
-          {% for reason, point in result.breakdown.items() %}
-            <li>{{ reason }}: {{ point }}</li>
-          {% endfor %}
-        </ul>
-      </div>
+      <details class="foldable">
+        <div class="breakdown">
+          <summary><h4>🔻 감점 항목</h4></summary>
+          <ul>
+            {% for reason, point in result.breakdown.items() %}
+              <li>{{ reason }}: {{ point }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </details>
       {% endif %}
 
       {% if result.feedback is defined and result.feedback | length > 0 %}
-      <div class="feedback">
-        <h4>💡 피드백</h4>
-        <ul>
-          {% for fb in result.feedback %}
-            <li>{{ fb }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% else %}
-      <div class="feedback">
-        <h4>💡 피드백</h4>
-        <p>피드백이 존재하지 않습니다.</p>
-      </div>
+      <details class="foldable">
+        <div class="feedback">
+          <summary><h4>💡 피드백</h4></summary>
+          <ul>
+            {% for fb in result.feedback %}
+              <li>{{ fb }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% else %}
+        <div class="feedback">
+          <summary><h4>💡 피드백</h4></summary>
+          <p>피드백이 존재하지 않습니다.</p>
+        </div>
+      </details>
       {% endif %}
     </div>
 
